@@ -42,7 +42,7 @@
 
 **Lumina Shield** is a multi-agent AI platform that analyzes viral messages, suspicious URLs, and social media content to detect misinformation, phishing campaigns, and manipulation tactics. It combines large language model reasoning with real-time threat intelligence feeds and a multi-layer verification pipeline.
 
-Built for a global audience, it supports **English, Urdu (Roman & Nastaliq), Spanish, and Arabic** — and can be extended to any language Gemini understands.
+Built for a global audience, it supports **English, Urdu (Roman & Nastaliq), Spanish, Arabic and more** — and can be extended to any language Gemini understands.
 
 ### What it solves
 
