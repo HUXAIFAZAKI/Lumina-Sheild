@@ -1,0 +1,112 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib64/
+wheels/
+
+# ── Virtual Environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# ── Environment & Secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+secrets.json
+config.local.*
+
+# ── Data & Database ───────────────────────────────────────────────────────────
+data/sachai.db
+data/*.db
+data/*.sqlite
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Cache ─────────────────────────────────────────────────────────────────────
+.cache/
+disk_cache/
+__cache__/
+*.cache
+.streamlit/cache/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+lumina_*.log
+
+# ── Generated Reports ─────────────────────────────────────────────────────────
+lumina_report_*.pdf
+reports/
+*.pdf
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+test-results/
+
+# ── MyPy / Type Checking ──────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ── Packaging ─────────────────────────────────────────────────────────────────
+MANIFEST
+
+# ── Streamlit ─────────────────────────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── Temporary files ───────────────────────────────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+desktop.ini
+$RECYCLE.BIN/
+
+# ── Node (for lib/ assets if rebuilt) ────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*

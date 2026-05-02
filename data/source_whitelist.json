@@ -1,0 +1,282 @@
+[
+  {
+    "domain": "pid.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "health"],
+    "official_url": "https://pid.gov.pk",
+    "display_name": "Press Information Department"
+  },
+  {
+    "domain": "mofa.gov.pk",
+    "tier": 1,
+    "claim_types": ["political"],
+    "official_url": "https://mofa.gov.pk",
+    "display_name": "Ministry of Foreign Affairs"
+  },
+  {
+    "domain": "finance.gov.pk",
+    "tier": 1,
+    "claim_types": ["financial", "scheme"],
+    "official_url": "https://finance.gov.pk",
+    "display_name": "Ministry of Finance"
+  },
+  {
+    "domain": "nhsrc.gov.pk",
+    "tier": 1,
+    "claim_types": ["health"],
+    "official_url": "https://nhsrc.gov.pk",
+    "display_name": "National Health Services"
+  },
+  {
+    "domain": "bisp.gov.pk",
+    "tier": 1,
+    "claim_types": ["financial", "scheme"],
+    "official_url": "https://bisp.gov.pk",
+    "display_name": "BISP"
+  },
+  {
+    "domain": "hec.gov.pk",
+    "tier": 1,
+    "claim_types": ["education", "scheme"],
+    "official_url": "https://hec.gov.pk",
+    "display_name": "Higher Education Commission"
+  },
+  {
+    "domain": "pta.gov.pk",
+    "tier": 1,
+    "claim_types": ["cyber", "scheme"],
+    "official_url": "https://pta.gov.pk",
+    "display_name": "PTA"
+  },
+  {
+    "domain": "fbr.gov.pk",
+    "tier": 1,
+    "claim_types": ["financial", "scheme"],
+    "official_url": "https://fbr.gov.pk",
+    "display_name": "FBR"
+  },
+  {
+    "domain": "secp.gov.pk",
+    "tier": 1,
+    "claim_types": ["financial"],
+    "official_url": "https://secp.gov.pk",
+    "display_name": "SECP"
+  },
+  {
+    "domain": "nacta.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "cyber"],
+    "official_url": "https://nacta.gov.pk",
+    "display_name": "NACTA"
+  },
+  {
+    "domain": "moib.gov.pk",
+    "tier": 1,
+    "claim_types": ["political"],
+    "official_url": "https://moib.gov.pk",
+    "display_name": "Ministry of Information"
+  },
+  {
+    "domain": "ecp.gov.pk",
+    "tier": 1,
+    "claim_types": ["political"],
+    "official_url": "https://ecp.gov.pk",
+    "display_name": "Election Commission"
+  },
+  {
+    "domain": "biek.edu.pk",
+    "tier": 1,
+    "claim_types": ["education_board"],
+    "official_url": "https://biek.edu.pk",
+    "display_name": "Board of Intermediate Education Karachi"
+  },
+  {
+    "domain": "bsek.edu.pk",
+    "tier": 1,
+    "claim_types": ["education_board"],
+    "official_url": "https://bsek.edu.pk",
+    "display_name": "Board of Secondary Education Karachi"
+  },
+  {
+    "domain": "fbise.edu.pk",
+    "tier": 1,
+    "claim_types": ["education_board"],
+    "official_url": "https://fbise.edu.pk",
+    "display_name": "Federal Board of Intermediate & Secondary Education"
+  },
+  {
+    "domain": "punjab.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "scheme", "health"],
+    "official_url": "https://punjab.gov.pk",
+    "display_name": "Government of Punjab"
+  },
+  {
+    "domain": "sindh.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "scheme", "health"],
+    "official_url": "https://sindh.gov.pk",
+    "display_name": "Government of Sindh"
+  },
+  {
+    "domain": "khyberpakhtunkhwa.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "scheme", "health"],
+    "official_url": "https://khyberpakhtunkhwa.gov.pk",
+    "display_name": "Government of Khyber Pakhtunkhwa"
+  },
+  {
+    "domain": "balochistan.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "scheme", "health"],
+    "official_url": "https://balochistan.gov.pk",
+    "display_name": "Government of Balochistan"
+  },
+  {
+    "domain": "nha.gov.pk",
+    "tier": 1,
+    "claim_types": ["health"],
+    "official_url": "https://nha.gov.pk",
+    "display_name": "National Health Authority"
+  },
+  {
+    "domain": "pbs.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "financial"],
+    "official_url": "https://pbs.gov.pk",
+    "display_name": "Pakistan Bureau of Statistics"
+  },
+  {
+    "domain": "spsc.gov.pk",
+    "tier": 1,
+    "claim_types": ["political"],
+    "official_url": "https://spsc.gov.pk",
+    "display_name": "Sindh Public Service Commission"
+  },
+  {
+    "domain": "ppsc.gov.pk",
+    "tier": 1,
+    "claim_types": ["political"],
+    "official_url": "https://ppsc.gov.pk",
+    "display_name": "Punjab Public Service Commission"
+  },
+  {
+    "domain": "fpsc.gov.pk",
+    "tier": 1,
+    "claim_types": ["political"],
+    "official_url": "https://fpsc.gov.pk",
+    "display_name": "Federal Public Service Commission"
+  },
+  {
+    "domain": "nadra.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "scheme"],
+    "official_url": "https://nadra.gov.pk",
+    "display_name": "NADRA"
+  },
+  {
+    "domain": "passport.gov.pk",
+    "tier": 1,
+    "claim_types": ["political", "scheme"],
+    "official_url": "https://passport.gov.pk",
+    "display_name": "Passport Office"
+  },
+  {
+    "domain": "dawn.com",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://dawn.com",
+    "display_name": "Dawn News"
+  },
+  {
+    "domain": "geo.tv",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://geo.tv",
+    "display_name": "Geo News"
+  },
+  {
+    "domain": "tribune.com.pk",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://tribune.com.pk",
+    "display_name": "Express Tribune"
+  },
+  {
+    "domain": "arynews.tv",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://arynews.tv",
+    "display_name": "ARY News"
+  },
+  {
+    "domain": "bolnews.com",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://bolnews.com",
+    "display_name": "BOL News"
+  },
+  {
+    "domain": "92newshd.tv",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://92newshd.tv",
+    "display_name": "92 News"
+  },
+  {
+    "domain": "samaa.tv",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://samaa.tv",
+    "display_name": "Samaa TV"
+  },
+  {
+    "domain": "dunyanews.tv",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://dunyanews.tv",
+    "display_name": "Dunya News"
+  },
+  {
+    "domain": "urdupoint.com",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://urdupoint.com",
+    "display_name": "UrduPoint"
+  },
+  {
+    "domain": "jang.com.pk",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://jang.com.pk",
+    "display_name": "Jang"
+  },
+  {
+    "domain": "thenews.com.pk",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://thenews.com.pk",
+    "display_name": "The News"
+  },
+  {
+    "domain": "humnews.pk",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://humnews.pk",
+    "display_name": "Hum News"
+  },
+  {
+    "domain": "aaj.tv",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://aaj.tv",
+    "display_name": "Aaj News"
+  },
+  {
+    "domain": "express.pk",
+    "tier": 2,
+    "claim_types": ["all"],
+    "official_url": "https://express.pk",
+    "display_name": "Daily Express"
+  }
+]
