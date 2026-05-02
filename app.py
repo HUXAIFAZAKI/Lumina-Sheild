@@ -855,7 +855,16 @@ with tab1:
             if demo:
                 card = generate_citizen_card(verdicts, tactics, url_checks, entities, "English")
 
-            # ---------- Verdict Display ----------
+            # ── Persist results so the display survives chat reruns ──
+            st.session_state["citizen_result"] = {
+                "card": card, "verdicts": verdicts, "tactics": tactics,
+                "url_checks": url_checks, "entities": entities,
+                "context_data": context_data, "_research_text": _research_text,
+                "sub_hash": sub_hash, "raw_text": raw_text, "claims": claims,
+            }
+            st.rerun()
+
+            # ---------- Verdict Display ----------  (unreachable — rerun called above)
             st.markdown("<hr class='ls-divider'>", unsafe_allow_html=True)
             badge_color = {
                 "TRUE": "linear-gradient(135deg,#2e7d32,#43a047)",
@@ -1134,6 +1143,300 @@ with tab1:
                     st.success(f"✅ Reported anonymously from **{report_city}**. Thank you for protecting others!")
             else:
                 st.caption("Your analysis is private by default. Tick the checkbox above to contribute to the community map.")
+
+    # ---- Render citizen results (persists across chat reruns) ----
+    if "citizen_result" in st.session_state:
+        _cr = st.session_state["citizen_result"]
+        card           = _cr["card"]
+        verdicts       = _cr["verdicts"]
+        tactics        = _cr["tactics"]
+        url_checks     = _cr["url_checks"]
+        entities       = _cr["entities"]
+        context_data   = _cr["context_data"]
+        _research_text = _cr["_research_text"]
+        sub_hash       = _cr["sub_hash"]
+        raw_text       = _cr["raw_text"]
+        claims         = _cr["claims"]
+
+        # ---------- Verdict Display ----------
+        st.markdown("<hr class='ls-divider'>", unsafe_allow_html=True)
+        badge_color = {
+            "TRUE": "linear-gradient(135deg,#2e7d32,#43a047)",
+            "FALSE": "linear-gradient(135deg,#b71c1c,#e53935)",
+            "FAKE": "linear-gradient(135deg,#b71c1c,#e53935)",
+            "SCAM": "linear-gradient(135deg,#e65100,#ff6d00)",
+            "MANIPULATED": "linear-gradient(135deg,#f57f17,#fbc02d)",
+            "MIXTURE": "linear-gradient(135deg,#c88b00,#E5A100)",
+        }.get(card["overall_label"], "linear-gradient(135deg,#9E9E9E,#bdbdbd)")
+        overall_emoji = {
+            "TRUE": "✅", "FALSE": "❌", "FAKE": "🚫",
+            "SCAM": "🚨", "MANIPULATED": "⚠️", "MIXTURE": "🟡",
+        }.get(card["overall_label"], "❓")
+        st.markdown(f"""
+        <div style='text-align:center; padding: 0.5rem 0 1rem;'>
+            <div class="overall-badge" style="background:{badge_color};">
+                {overall_emoji}&nbsp; {card['overall_label']}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ---------- Metadata & CTA Scrutiny ----------
+        if context_data and (context_data.get("ctas") or context_data.get("metadata", {}).get("locations")):
+            with st.expander("🔍 Deep Inspection — Locations, Dates & CTAs"):
+                cols = st.columns(2)
+                with cols[0]:
+                    st.markdown("**📍 Locations & Dates mentioned**")
+                    for loc in context_data.get("metadata", {}).get("locations", []):
+                        st.write(f"- {loc}")
+                    for dt in context_data.get("metadata", {}).get("dates", []):
+                        st.write(f"- 🗓️ {dt}")
+                with cols[1]:
+                    st.markdown("**🔗 Call-to-Action links detected**")
+                    for cta in context_data.get("ctas", []):
+                        st.write(f"- {cta['text']} `({cta['type']})`")
+
+        # ---------- Individual Claim Verdicts ----------
+        if _research_text:
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🔍</div><span>What We Found</span></div>", unsafe_allow_html=True)
+            st.info(_research_text)
+
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>📋</div><span>Claim Breakdown</span></div>", unsafe_allow_html=True)
+        for item in card["verdicts"]:
+            label = item["label"]
+            emoji = "✅" if label == "TRUE" else "❌" if label in ("FALSE","FAKE") else "🚨" if label == "SCAM" else "⚠️" if label == "MANIPULATED" else "🟡"
+            conf = item.get("confidence", 0)
+            conf_color = "#4CAF50" if conf > 70 else "#FF9800" if conf > 40 else "#f44336"
+            badge_cls = f"badge-{label.lower()}"
+            st.markdown(f"""
+            <div class="verdict-card">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <span class="severity-badge {badge_cls}">{emoji} {label}</span>
+                    <span style="font-size:0.78rem; color:#7a7268; font-weight:600;">Confidence {conf}%</span>
+                </div>
+                <div class="risk-gauge"><div class="risk-fill" style="width:{conf}%; background:linear-gradient(90deg,{conf_color},{conf_color}cc);"></div></div>
+                <p style="margin:10px 0 4px; font-weight:600; font-size:0.92rem;">{item['claim'][:180]}</p>
+                <p style="margin:0; color:#7a7268; font-size:0.85rem; line-height:1.5;">{item["evidence"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ---------- URL Danger Warnings ----------
+        for uw in card["url_warnings"]:
+            flags_html = " ".join(
+                f"<span style='background:#fde0e0;color:#9c1f1f;padding:2px 9px;border-radius:20px;font-size:0.72rem;font-weight:600;'>⚠️ {flag}</span>"
+                for flag in uw.get("flags", [])
+            )
+            risk_pct = min(100, uw.get("risk_score", 0))
+            st.markdown(f"""
+            <div class="tactic-card" style="border-left:4px solid #e53935;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <span style="font-size:1.4rem;">🚨</span>
+                    <div>
+                        <strong style="font-size:0.95rem;">Dangerous Link — Risk {risk_pct}/100</strong><br>
+                        <span style="font-size:0.8rem;color:#7a7268;">Real site: <strong>{uw['url']}</strong></span>
+                    </div>
+                </div>
+                <div class="risk-gauge"><div class="risk-fill" style="width:{risk_pct}%;background:linear-gradient(90deg,#e53935,#ff6d00);"></div></div>
+                <div style="margin:10px 0 6px;">{flags_html}</div>
+                <p style="margin:6px 0 3px;font-size:0.88rem;">🔍 {uw.get('why_dangerous','')}</p>
+                <p style="margin:0;font-size:0.85rem;color:#7a7268;">⚠️ {uw.get('what_can_happen','')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ---------- Community Alert ----------
+        try:
+            from data.db import get_heatmap_data
+            h_data = get_heatmap_data()
+            city_count = sum(1 for row in h_data if row["city"] == user_location and row["verdict"] in ["FAKE", "SCAM", "FALSE", "MANIPULATED"])
+            if city_count > 0:
+                st.warning(f"📍 **Community Alert:** {city_count} similar scams reported in **{user_location}** recently. Stay vigilant!")
+        except:
+            pass
+
+        # ---------- Manipulation Tactics ----------
+        if card["tactics"]:
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🎭</div><span>How You're Being Manipulated</span></div>", unsafe_allow_html=True)
+            for t in card["tactics"]:
+                st.markdown(f"""
+                <div class="tactic-card">
+                    <strong style="font-size:0.9rem;">🎭 {t['tactic']}</strong>
+                    <p style="margin:6px 0 0; color:#7a7268; font-size:0.87rem; line-height:1.5;">{t['explanation']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ---------- AI Narrative Attribution (fingerprinting) ----------
+        if card["overall_label"] in ("FALSE", "FAKE", "SCAM", "MANIPULATED", "MIXTURE"):
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🧬</div><span>Narrative Fingerprint — Which Campaign Is This?</span></div>", unsafe_allow_html=True)
+            _narr_key = f"narrative_cluster_{sub_hash}"
+            if _narr_key not in st.session_state:
+                with st.spinner("🧠 Matching against known disinformation campaigns…"):
+                    from agents.narrator import identify_narrative_cluster
+                    _ev_sum = verdicts[0][1].get("evidence", "") if verdicts else ""
+                    st.session_state[_narr_key] = identify_narrative_cluster(
+                        raw_text, card["overall_label"], _ev_sum
+                    )
+            nc = st.session_state[_narr_key]
+            _nc_conf_color = {"High": "#b71c1c", "Medium": "#e65100", "Low": "#4CAF50"}.get(nc.get("confidence", "Low"), "#9E9E9E")
+            _tactics_html = " ".join(
+                f"<span style='background:#fff0c2;color:#7a5500;padding:2px 10px;border-radius:20px;font-size:0.72rem;font-weight:600;'>{t}</span>"
+                for t in nc.get("tactics_used", [])
+            )
+            _geo_html = ", ".join(f"🌍 {g}" for g in nc.get("geographic_spread", []))
+            st.markdown(f"""
+            <div class="tactic-card" style="border-left:4px solid {_nc_conf_color};">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <strong style="font-size:1rem;color:#1a1714;">🧬 {nc.get('cluster_name','Unknown Cluster')}</strong>
+                    <span style="font-size:0.75rem;font-weight:700;color:{_nc_conf_color};background:{_nc_conf_color}18;
+                                 padding:3px 12px;border-radius:20px;">{nc.get('confidence','?')} Confidence Match</span>
+                </div>
+                <p style="margin:0 0 8px;font-size:0.88rem;color:#4a4540;line-height:1.6;">{nc.get('description','')}</p>
+                <div style="display:flex;gap:20px;font-size:0.82rem;color:#7a7268;margin-bottom:8px;flex-wrap:wrap;">
+                    <span>📊 Seen ~<strong style="color:{_nc_conf_color};">{nc.get('similar_count',0)}</strong> times</span>
+                    <span>🗓️ First seen: <strong>{nc.get('first_seen','?')}</strong></span>
+                    <span>{_geo_html}</span>
+                </div>
+                <div style="margin-bottom:6px;">{_tactics_html}</div>
+                <p style="margin:4px 0 0;font-size:0.82rem;color:#9c1f1f;">⚠️ {nc.get('why_dangerous','')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>📤</div><span>Share This Correction</span></div>", unsafe_allow_html=True)
+        st.caption("Copy and forward this fact-checked reply to whoever sent you this message:")
+        st.code(card["whatsapp_reply"], language="text")
+
+        # ---------- Action Guide ----------
+        st.info(f"💡 **What to do:** {card['action_guide']}")
+
+        # ---------- Multilingual Explainer Bot ----------
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>💬</div><span>Ask Lumina — Follow-Up Questions</span></div>", unsafe_allow_html=True)
+        st.caption('Ask anything: "Why is this fake?", "What should I tell my parents?", "Is there any truth in it?" — answered in plain language.')
+
+        _chat_key = f"explainer_chat_{sub_hash}"
+        _ctx_key   = f"explainer_ctx_{sub_hash}"
+        if _chat_key not in st.session_state:
+            st.session_state[_chat_key] = []
+        if _ctx_key not in st.session_state:
+            _ev_ctx = verdicts[0][1].get("evidence", "") if verdicts else ""
+            st.session_state[_ctx_key] = (
+                f"You are Lumina Shield, a friendly AI fact-checker. "
+                f"The user just had a message verified. "
+                f"Verdict: {card['overall_label']} (confidence {verdicts[0][1].get('confidence',75) if verdicts else '?'}%). "
+                f"Key evidence: {_ev_ctx[:400]}. "
+                f"Original message snippet: {raw_text[:300]}. "
+                f"Answer follow-up questions in simple, friendly language. "
+                f"If the user writes in Urdu or Roman Urdu, reply in Roman Urdu. "
+                f"Keep answers under 4 sentences."
+            )
+
+        # Render chat history
+        for _msg in st.session_state[_chat_key]:
+            with st.chat_message(_msg["role"]):
+                st.markdown(_msg["content"])
+
+        if _user_q := st.chat_input("Ask a follow-up question…", key=f"chat_input_{sub_hash}"):
+            st.session_state[_chat_key].append({"role": "user", "content": _user_q})
+            with st.chat_message("user"):
+                st.markdown(_user_q)
+
+            with st.chat_message("assistant"):
+                _placeholder = st.empty()
+                _full_resp = ""
+                try:
+                    import groq as _groq_sdk
+                    _groq_client = _groq_sdk.Groq(api_key=os.getenv("GROQ_API_KEY"), max_retries=0, timeout=20.0)
+                    _messages = [{"role": "system", "content": st.session_state[_ctx_key]}]
+                    for _m in st.session_state[_chat_key][-8:]:   # keep last 8 turns
+                        _messages.append({"role": _m["role"], "content": _m["content"]})
+                    _stream = _groq_client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=_messages,
+                        stream=True,
+                        max_tokens=400,
+                        temperature=0.6,
+                    )
+                    for _chunk in _stream:
+                        _delta = (_chunk.choices[0].delta.content or "")
+                        _full_resp += _delta
+                        _placeholder.markdown(_full_resp + "▌")
+                    _placeholder.markdown(_full_resp)
+                except Exception as _ce:
+                    _full_resp = f"Sorry, I couldn't respond right now: {_ce}"
+                    _placeholder.markdown(_full_resp)
+                st.session_state[_chat_key].append({"role": "assistant", "content": _full_resp})
+
+        # ---------- Reporting Buttons ----------
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>📞</div><span>Report This to Authorities</span></div>", unsafe_allow_html=True)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1: st.link_button("🚨 FIA Cybercrime", "https://complaint.fia.gov.pk")
+        with col2: st.link_button("📡 PTA Complaint", "https://pta.gov.pk/en/consumer-support/complaints")
+        with col3: st.link_button("🏦 SECP Fraud", "https://www.secp.gov.pk/complaint/")
+        with col4: st.link_button("🛡️ NCERT", "https://ncart.gov.pk/report/")
+
+        # ---------- Shareable Verdict Card (PNG) ----------
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>🖼️</div><span>Shareable Verdict Card</span></div>", unsafe_allow_html=True)
+        st.caption("Download a beautiful PNG card to share on WhatsApp, Twitter/X, or any social platform.")
+        _top_claim_text = verdicts[0][0].get("text", "") if verdicts else raw_text[:120]
+        _top_evidence   = verdicts[0][1].get("evidence", "") if verdicts else ""
+        try:
+            from utils.report_generator import generate_verdict_card_png
+            _card_png = generate_verdict_card_png(
+                verdict_label=card["overall_label"],
+                confidence=verdicts[0][1].get("confidence", 75) if verdicts else 75,
+                claim_snippet=_top_claim_text,
+                evidence_snippet=_top_evidence,
+                report_url="https://luminashield.app",
+            )
+            _png_col1, _png_col2 = st.columns([0.5, 0.5])
+            with _png_col1:
+                st.image(_card_png, caption="Preview — right-click to copy", use_container_width=True)
+            with _png_col2:
+                st.download_button(
+                    "⬇️ Download Verdict Card (PNG)",
+                    data=_card_png,
+                    file_name=f"lumina_verdict_{card['overall_label'].lower()}.png",
+                    mime="image/png",
+                    use_container_width=True,
+                )
+                st.caption("Share this card on WhatsApp, Twitter/X, or Instagram Stories to spread awareness and protect others.")
+        except Exception as _e:
+            st.info(f"Card generation unavailable: {_e}")
+
+        # ---------- Opt-in Community Reporting ----------
+        st.markdown("<hr class='ls-divider'>", unsafe_allow_html=True)
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>🌍</div><span>Help Others — Report to Community</span></div>", unsafe_allow_html=True)
+
+        _rpt_col1, _rpt_col2 = st.columns([0.55, 0.45])
+        with _rpt_col1:
+            share_consent = st.checkbox(
+                "📢 Share this verdict anonymously with the community map",
+                value=False, key="share_consent",
+                help="Adds this report to the Global Dashboard heatmap and feed so others in your city can be warned."
+            )
+        with _rpt_col2:
+            # Dynamic city — pre-select user_location chosen at top
+            _cities = get_all_city_names()
+            report_city = st.selectbox(
+                "📍 Report city",
+                _cities,
+                index=_cities.index(user_location) if user_location in _cities else 0,
+                key="report_city",
+                help="Which city should this report be attributed to on the heatmap?"
+            )
+
+        if share_consent:
+            if st.button("📤 Submit Community Report", key="submit_report_btn"):
+                sub_id = log_submission(raw_text, "Citizen", "app")
+                for idx, (_, v) in enumerate(verdicts):
+                    log_verdict(sub_id, idx, v["verdict"], v.get("confidence", 0),
+                                v.get("evidence", ""),
+                                json.dumps([t["tactic"] for t in tactics]))
+                _cat = claims[0].get("type", "general") if claims else "general"
+                _verdict_val = verdicts[0][1]["verdict"] if verdicts else card["overall_label"]
+                log_heatmap(report_city, _cat, _verdict_val)
+                if card["overall_label"] in ["FAKE", "SCAM", "FALSE", "MANIPULATED"]:
+                    if not check_feed_duplicate(raw_text[:100]):
+                        log_to_feed(sub_id, card["overall_label"], raw_text[:100] + "…")
+                st.success(f"✅ Reported anonymously from **{report_city}**. Thank you for protecting others!")
+        else:
+            st.caption("Your analysis is private by default. Tick the checkbox above to contribute to the community map.")
 
 # ===============================
 # TAB 2: CYBER ANALYST

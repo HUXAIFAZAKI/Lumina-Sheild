@@ -10,7 +10,7 @@
 [![Groq](https://img.shields.io/badge/Groq-Llama_3-orange)](https://groq.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-> Detect fake news, phishing scams, manipulated content, and malicious URLs in viral messages — with multilingual support focused on Urdu/Pakistani digital landscape.
+> Detect fake news, phishing scams, manipulated content, and malicious URLs — with multilingual support and real-time threat intelligence for anyone, anywhere.
 
 </div>
 
@@ -42,17 +42,17 @@
 
 **Lumina Shield** is a multi-agent AI platform that analyzes viral messages, suspicious URLs, and social media content to detect misinformation, phishing campaigns, and manipulation tactics. It combines large language model reasoning with real-time threat intelligence feeds and a multi-layer verification pipeline.
 
-Originally built with a focus on **Pakistani digital threats** (BISP, NADRA, HEC, FBR, Ehsaas scams, Urdu-language propaganda), the platform supports **English, Urdu (Roman & Nastaliq), Spanish, and Arabic**.
+Built for a global audience, it supports **English, Urdu (Roman & Nastaliq), Spanish, and Arabic** — and can be extended to any language Gemini understands.
 
 ### What it solves
 
-| Problem                         | Lumina Shield's Approach                                                  |
-| ------------------------------- | ------------------------------------------------------------------------- |
-| Viral fake news on WhatsApp     | AI decomposition into verifiable claims + LLM fact-checking               |
-| Phishing / scam URLs            | 12+ concurrent enrichment checks (VirusTotal, AbuseIPDB, WHOIS, DNS, SSL) |
-| Manipulation tactics in content | Pattern detection: urgency, fear, fake authority, religious framing       |
-| Multilingual misinformation     | Automatic language detection, Urdu transliteration, localized verdicts    |
-| Domain impersonation            | Typosquatting detection, domain age checks, DNS genealogy graphs          |
+| Problem                                            | Lumina Shield's Approach                                                    |
+| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| Viral fake news (WhatsApp, Telegram, social media) | AI decomposition into verifiable claims + LLM fact-checking                 |
+| Phishing / scam URLs                               | 12+ concurrent enrichment checks (VirusTotal, AbuseIPDB, WHOIS, DNS, SSL)   |
+| Manipulation tactics in content                    | Pattern detection: urgency, fear, fake authority, suppression, social proof |
+| Multilingual misinformation                        | Automatic language detection, transliteration, localized verdicts           |
+| Domain impersonation                               | Typosquatting detection, domain age checks, DNS genealogy graphs            |
 
 ---
 
@@ -61,7 +61,7 @@ Originally built with a focus on **Pakistani digital threats** (BISP, NADRA, HEC
 - **🔍 Multi-Layer Fact Checking** — 5-layer verification pipeline from whitelist matching to LLM knowledge fallback
 - **🦠 IOC Enrichment** — Asynchronous parallel enrichment of IPs, domains, hashes, and emails via 30+ sources
 - **🧠 Manipulation Detection** — Identifies 6 psychological manipulation tactics (URGENCY, FEAR, FAKE_AUTHORITY, SUPPRESSION, RELIGIOUS_FRAMING, SOCIAL_PROOF)
-- **🌐 Multilingual** — Urdu (Roman + Nastaliq), Arabic, Spanish, English
+- **🌐 Multilingual** — English, Urdu (Roman + Nastaliq), Arabic, Spanish — extensible to any language supported by Gemini
 - **🗺️ Domain Genealogy** — Interactive network graph of DNS records, subdomains, registrar, and typosquatting neighbors
 - **🌍 Heatmap** — Geographic distribution of detected misinformation by category
 - **👥 Community Feed** — Shared, deduplicated verdicts with upvote system
@@ -78,7 +78,7 @@ Viral Message / URL
         │
         ▼
 ┌───────────────┐
-│  Translator   │  Language detection, Urdu transliteration, IOC extraction
+│  Translator   │  Language detection, transliteration, IOC extraction
 └───────┬───────┘
         │
         ▼
@@ -122,7 +122,7 @@ Lumina Shield is built around **8 specialized agents** that operate in a coordin
 
 ### 1. `Translator`
 
-Detects language, transliterates Roman Urdu/Arabic to normalized English, and extracts structured artifacts (URLs, IPs, phone numbers, emails) from raw message text.
+Detects language, transliterates non-Latin scripts to normalized English, and extracts structured artifacts (URLs, IPs, phone numbers, emails) from raw message text.
 
 ### 2. `Decomposer`
 
@@ -136,8 +136,8 @@ Uses Gemini with structured JSON prompts to break a viral message into:
 
 Five-layer verification engine:
 
-1. **Whitelist** — Direct match against curated trusted Pakistani & global sources
-2. **Structural red-flags** — Gov-keyword spoofing, free TLD abuse (`.xyz`, `.tk`, `.ml`)
+1. **Whitelist** — Direct match against a curated list of trusted global sources
+2. **Structural red-flags** — Government/brand keyword spoofing, free TLD abuse (`.xyz`, `.tk`, `.ml`)
 3. **Similarity scoring** — Levenshtein distance against trusted domains
 4. **Domain age** — WHOIS creation date; domains < 30 days old flagged
 5. **LLM fallback** — Gemini knowledge-grounded web search with Groq structuring
@@ -157,14 +157,14 @@ Runs **12 concurrent async enrichment tasks** on every IOC extracted:
 
 Identifies psychological manipulation patterns in message text:
 
-| Tactic              | Example Pattern                               |
-| ------------------- | --------------------------------------------- |
-| `URGENCY`           | "Act within 24 hours or lose your account"    |
-| `FEAR`              | "Your account will be blocked"                |
-| `FAKE_AUTHORITY`    | Impersonating NADRA, HEC, FBR, Prime Minister |
-| `SUPPRESSION`       | "Don't tell anyone, limited seats"            |
-| `RELIGIOUS_FRAMING` | Exploiting religious sentiment for sharing    |
-| `SOCIAL_PROOF`      | "Thousands have already registered"           |
+| Tactic              | Example Pattern                                                    |
+| ------------------- | ------------------------------------------------------------------ |
+| `URGENCY`           | "Act within 24 hours or lose your account"                         |
+| `FEAR`              | "Your account will be blocked"                                     |
+| `FAKE_AUTHORITY`    | Impersonating government agencies, officials, or well-known brands |
+| `SUPPRESSION`       | "Don't tell anyone, limited seats"                                 |
+| `RELIGIOUS_FRAMING` | Exploiting religious or cultural sentiment to encourage sharing    |
+| `SOCIAL_PROOF`      | "Thousands have already registered"                                |
 
 ### 6. `Narrator`
 
@@ -339,49 +339,6 @@ lumina-shield/
 │   ├── cartographer.py           # Domain genealogy graph
 │   └── searcher.py               # Web search + LLM structuring
 │
-├── src/
-│   ├── config.py                 # Environment & API key configuration
-│   ├── logger.py                 # Structured logging setup
-│   ├── main.py                   # Backend entry point (placeholder)
-│   ├── api/
-│   │   ├── routes.py             # HTTP API route definitions
-│   │   └── controllers.py        # Request/response handlers
-│   ├── detection/
-│   │   ├── heuristics.py         # URL/content heuristic rules
-│   │   └── rules.py              # Rule engine definitions
-│   ├── enrichment/
-│   │   └── normalizer.py         # IOC data normalization
-│   ├── extraction/
-│   │   └── artifact_extractor.py # URL/IP/hash/email extraction
-│   ├── graph/
-│   │   └── graph_builder.py      # Genealogy graph construction
-│   ├── integrations/
-│   │   ├── orchestrator.py       # Coordinates all enrichment engines
-│   │   ├── configurations.py     # Engine enable/disable config
-│   │   ├── models.py             # Pydantic data models
-│   │   ├── rotator.py            # API key rotation logic
-│   │   ├── cache_integration.py  # Cache layer for enrichment
-│   │   └── engines/
-│   │       ├── base.py           # Abstract enrichment engine
-│   │       ├── virustotal.py     # VirusTotal integration
-│   │       ├── abuseip_db.py     # AbuseIPDB integration
-│   │       ├── alienvault_otx.py # AlienVault OTX integration
-│   │       ├── whois.py          # WHOIS integration
-│   │       └── ...
-│   ├── llm/
-│   │   ├── generator.py          # LLM response generation
-│   │   └── prompt_builder.py     # Prompt template construction
-│   ├── rag/
-│   │   ├── retriever.py          # RAG retrieval logic
-│   │   └── vector_store.py       # Vector embedding store
-│   ├── scoring/
-│   │   └── risk_calculator.py    # Composite risk score calculation
-│   ├── storage/
-│   │   ├── db.py                 # Database connection management
-│   │   └── models.py             # ORM models
-│   └── tasks/
-│       └── worker.py             # Background task worker
-│
 ├── utils/
 │   ├── api_clients.py            # HTTP client wrappers
 │   ├── cache.py                  # In-memory cache utilities
@@ -390,7 +347,7 @@ lumina-shield/
 │
 ├── data/
 │   ├── db.py                     # SQLite database schema & operations
-│   └── source_whitelist.json     # Curated trusted source list
+│   └── source_whitelist.json     # Curated trusted global source list
 │
 ├── lib/                          # Bundled frontend libraries
 │   ├── vis-9.1.2/                # vis-network (graph visualization)
