@@ -2808,9 +2808,9 @@ def _render_cyber_deep_mode():
             from data.db import add_annotation, get_annotations
             from utils.api_clients import dns_resolve_all as _dns_r, crt_sh_subdomains as _crt
 
-            st.subheader("📝 Research Annotations")
+            st.subheader("📝 Notes & Annotations")
             with st.form("ann_form", clear_on_submit=True):
-                note = st.text_area("Research notes", placeholder="Observations, hypotheses, pivots...")
+                note = st.text_area("Notes", placeholder="Observations, hypotheses, pivots...")
                 tags = st.text_input("Tags", placeholder="phishing, apt29, c2")
                 if st.form_submit_button("💾 Save Note") and note:
                     add_annotation(r_domain, note, tags)
@@ -2961,7 +2961,7 @@ def _render_cyber_deep_mode():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        st.info("Enter a domain above to begin research.")
+        st.info("Enter a domain above to begin search.")
 
 # ===================================================
 # TAB 2: CYBER ANALYST  (Basic + Deep Mode dispatch)
