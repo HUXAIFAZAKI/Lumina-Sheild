@@ -232,7 +232,7 @@ def generate_verdict_card_png(
         img.paste(border_img, (paste_x, paste_y))
         draw.text(
             (paste_x + 10, paste_y + 152),
-            "Scan for full report",
+            "Scan for more info",
             font=fn_foot, fill=TEXT_CAP,
         )
     except Exception:

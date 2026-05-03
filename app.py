@@ -222,7 +222,12 @@ st.markdown("""
         color: #fff !important;
         box-shadow: 0 3px 12px rgba(229,161,0,0.38) !important;
     }
+    .stTabs [aria-selected="true"]:hover {
+        background: linear-gradient(135deg, #E5A100, #FF8C42) !important;
+        color: #fff !important;
+    }
     .stTabs [aria-selected="true"] * { color: #fff !important; -webkit-text-fill-color: #fff !important; }
+    .stTabs [aria-selected="true"]:hover * { color: #fff !important; -webkit-text-fill-color: #fff !important; }
 
     /* ── Cards ───────────────────────────────────────────── */
     .ls-card, .verdict-card, .info-card, .tactic-card, .feed-card {
@@ -598,10 +603,11 @@ st.markdown("""
     <h1>🛡️ Lumina Shield</h1>
     <div class="tagline">Global AI-Powered Misinformation &amp; Cyber Threat Defense Platform</div>
     <div class="badge-row">
-        <span class="ls-badge">🤖 Gemini 2.5-Flash</span>
+        <span class="ls-badge">🤖 Llama 3.3/Gemini 2.5</span>
         <span class="ls-badge">🌐 Real-Time OSINT</span>
-        <span class="ls-badge">🔬 15+ Free APIs</span>
+        <span class="ls-badge">🔬 20+ Intel Sources</span>
         <span class="ls-badge">🧬 MITRE ATT&amp;CK</span>
+        <span class="ls-badge">📧 Email Phishing AI</span>
         <span class="ls-badge">🇵🇰 Multilingual</span>
     </div>
 </div>
