@@ -680,3 +680,383 @@ def generate_pdf(url: str, iocs: dict, summary_text: str = None, narrative_data:
 
     doc.build(story)
     return path
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Deep Intelligence PDF (Cyber Analyst Deep Mode)
+# Includes all basic forensics sections PLUS threat actor profile, MITRE
+# ATT&CK mapping, kill-chain timeline, YARA/Snort rules, and annotations.
+# ──────────────────────────────────────────────────────────────────────────
+
+def generate_deep_pdf(
+    target: str,
+    iocs: dict = None,
+    summary_text: str = None,
+    narrative_data: dict = None,
+    actor_profile: dict = None,
+    kill_chain_data: dict = None,
+    yara_rule: str = None,
+    snort_rule: str = None,
+    annotations: list = None,
+) -> str:
+    """Generate a comprehensive deep-mode forensic PDF report."""
+    iocs = iocs or {}
+    tmp_dir = tempfile.gettempdir()
+    filename = f"lumina_deep_{hashlib.md5(target.encode()).hexdigest()}.pdf"
+    path = os.path.join(tmp_dir, filename)
+
+    doc = SimpleDocTemplate(path, pagesize=A4,
+                            topMargin=40, bottomMargin=40,
+                            leftMargin=40, rightMargin=40)
+    styles = getSampleStyleSheet()
+
+    # ── Shared styles (same palette as generate_pdf) ───────────────────────
+    title_style = ParagraphStyle('DTitle', parent=styles['Title'],
+        fontSize=22, textColor=colors.HexColor("#c88b00"), spaceAfter=4, leading=28)
+    subtitle_style = ParagraphStyle('DSubtitle', parent=styles['Normal'],
+        fontSize=9, textColor=colors.HexColor("#7a7268"), spaceAfter=2)
+    heading_style = ParagraphStyle('DH2', parent=styles['Heading2'],
+        fontSize=13, textColor=colors.HexColor("#1a1714"), spaceBefore=18, spaceAfter=6)
+    subheading_style = ParagraphStyle('DH3', parent=styles['Heading3'],
+        fontSize=11, textColor=colors.HexColor("#c88b00"), spaceBefore=10, spaceAfter=4)
+    deep_heading_style = ParagraphStyle('DH2Deep', parent=styles['Heading2'],
+        fontSize=13, textColor=colors.HexColor("#b71c1c"), spaceBefore=18, spaceAfter=6)
+    normal_style = ParagraphStyle('DNormal', parent=styles['Normal'],
+        fontSize=9, textColor=colors.HexColor("#1a1714"), leading=14)
+    caption_style = ParagraphStyle('DCaption', parent=styles['Normal'],
+        fontSize=8, textColor=colors.HexColor("#7a7268"), leading=12)
+    code_style = ParagraphStyle('DCode', parent=styles['Normal'],
+        fontSize=8, textColor=colors.HexColor("#1a1714"),
+        fontName='Courier', leading=12, leftIndent=10)
+    cell_style = ParagraphStyle('DCell', parent=styles['Normal'],
+        fontSize=8, textColor=colors.HexColor("#1a1714"), leading=11)
+    footer_style = ParagraphStyle('DFooter', parent=styles['Normal'],
+        fontSize=8, textColor=colors.HexColor("#a09585"), leading=11)
+
+    import re as _re
+
+    def _md_to_rl(text: str) -> str:
+        text = _re.sub(r'<[^>]+>', '', str(text)).strip()
+        text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        parts = _re.split(r'\*\*(.+?)\*\*', text)
+        result = parts[0]
+        for i in range(1, len(parts), 2):
+            bold_text = parts[i]
+            after = parts[i + 1] if i + 1 < len(parts) else ''
+            prefix = '<br/>' if result.strip() else ''
+            result += f'{prefix}<b>{bold_text}</b>{after}'
+        text = result
+        text = _re.sub(r'(?m)^\s*-\s+', '<br/>\u2022\u00a0', text)
+        text = text.replace('\n', '<br/>')
+        text = _re.sub(r'(<br/>){2,}', '<br/>', text)
+        return text
+
+    def _cp(text: str) -> 'Paragraph':
+        return Paragraph(_md_to_rl(str(text)), cell_style)
+
+    def _table_style(header_color="#E5A100", alt_row="#FFF8E7"):
+        return TableStyle([
+            ('BACKGROUND',    (0, 0), (-1,  0), colors.HexColor(header_color)),
+            ('TEXTCOLOR',     (0, 0), (-1,  0), colors.white),
+            ('FONTSIZE',      (0, 0), (-1,  0), 9),
+            ('FONTNAME',      (0, 0), (-1,  0), 'Helvetica-Bold'),
+            ('FONTSIZE',      (0, 1), (-1, -1), 8),
+            ('ALIGN',         (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN',        (0, 0), (-1,  0), 'MIDDLE'),
+            ('VALIGN',        (0, 1), (-1, -1), 'TOP'),
+            ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor("#ddd5c8")),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, colors.HexColor(alt_row)]),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ])
+
+    from reportlab.platypus import HRFlowable
+    story = []
+
+    # ===== COVER =====
+    story.append(Paragraph("Lumina Shield — Deep Intelligence Report", title_style))
+    story.append(Paragraph(f"Target: {target}", subtitle_style))
+    story.append(Paragraph("Mode: Cyber Analyst · Deep Mode", subtitle_style))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%d %b %Y  %H:%M:%S UTC')}", subtitle_style))
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#E5A100"), spaceAfter=10))
+
+    # ===== RISK SCORE (basic forensics) =====
+    risk = iocs.get('risk_score', 0)
+    severity = "LOW" if risk < 3 else "MEDIUM" if risk < 6 else "HIGH" if risk < 8 else "CRITICAL"
+    sev_color = "#4CAF50" if risk < 3 else "#FF9800" if risk < 6 else "#f44336" if risk < 8 else "#b71c1c"
+    risk_data = [["Risk Score", "Severity", "Target"],
+                 [f"{risk} / 10", severity, target[:80]]]
+    rt = Table(risk_data, colWidths=[80, 100, 330])
+    rt.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor("#1a1714")),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, 0),  9),
+        ('FONTSIZE',      (0, 1), (-1, -1), 10),
+        ('FONTNAME',      (0, 1), (0,  1),  'Helvetica-Bold'),
+        ('TEXTCOLOR',     (0, 1), (0,  1),  colors.HexColor(sev_color)),
+        ('TEXTCOLOR',     (1, 1), (1,  1),  colors.HexColor(sev_color)),
+        ('ALIGN',         (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor("#ddd5c8")),
+        ('TOPPADDING',    (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+    ]))
+    story.append(rt)
+    story.append(Spacer(1, 14))
+
+    # ===== AI EXECUTIVE SUMMARY =====
+    if summary_text:
+        story.append(Paragraph("AI Executive Summary", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        story.append(Paragraph(_md_to_rl(str(summary_text)), normal_style))
+        story.append(Spacer(1, 10))
+
+    # ===== NARRATIVE INTELLIGENCE =====
+    if narrative_data and not narrative_data.get("error") and narrative_data.get("scenarios"):
+        story.append(Paragraph("Narrative Intelligence", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        archetype      = narrative_data.get("campaign_archetype", "Unknown")
+        target_profile = narrative_data.get("target_profile",     "Unknown")
+        narrative_text = narrative_data.get("narrative", "")
+        ci_low         = narrative_data.get("risk_confidence_low",  "—")
+        ci_high        = narrative_data.get("risk_confidence_high", "—")
+        if narrative_text:
+            story.append(Paragraph(_md_to_rl(str(narrative_text)), normal_style))
+            story.append(Spacer(1, 6))
+        meta_data = [["Campaign Archetype", "Target Profile", "Risk Confidence Range"],
+                     [_cp(archetype), _cp(target_profile), _cp(f"{ci_low} – {ci_high} / 10")]]
+        mt = Table(meta_data, colWidths=[170, 170, 170])
+        mt.setStyle(_table_style(header_color="#c88b00", alt_row="#fffdf5"))
+        story.append(mt)
+        story.append(Spacer(1, 8))
+        scenarios = narrative_data.get("scenarios", [])
+        if scenarios:
+            story.append(Paragraph("Attack Scenario Probabilities", subheading_style))
+            sc_data = [["Scenario", "Probability", "Description"]]
+            for sc in scenarios:
+                sc_data.append([_cp(f"{sc.get('icon','')} {sc.get('name','')}"),
+                                 _cp(f"{sc.get('probability', 0)}%"),
+                                 _cp(sc.get("description", ""))])
+            sc_t = Table(sc_data, colWidths=[160, 60, 290])
+            sc_t.setStyle(_table_style(header_color="#c88b00", alt_row="#fffdf5"))
+            story.append(sc_t)
+        story.append(Spacer(1, 10))
+
+    # ===== VIRUSTOTAL =====
+    vt_stats = iocs.get("vt_stats", {})
+    if vt_stats:
+        story.append(Paragraph("VirusTotal Detection Summary", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        mal   = vt_stats.get("malicious",  0)
+        sus   = vt_stats.get("suspicious", 0)
+        harm  = vt_stats.get("harmless",   0)
+        undet = vt_stats.get("undetected", 0)
+        total = mal + sus + harm + undet
+        vt_sum = [["Malicious", "Suspicious", "Harmless", "Undetected", "Total"],
+                  [str(mal), str(sus), str(harm), str(undet), str(total)]]
+        vt_t = Table(vt_sum, colWidths=[100, 100, 100, 100, 110])
+        vt_t.setStyle(_table_style(header_color="#c33"))
+        story.append(vt_t)
+        story.append(Spacer(1, 8))
+
+    # ===== EXTRACTED IOCs =====
+    story.append(Paragraph("Extracted IOCs", heading_style))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+    details = iocs.get("details", {})
+    abuse_score = str(details.get("abuseipdb", {}).get("abuseConfidenceScore", "N/A"))
+    ioc_data = [["Type", "Value", "AbuseIPDB Score"]]
+    for ip in iocs.get("ips",    []): ioc_data.append([_cp("IP"),     _cp(ip), _cp(abuse_score)])
+    for d  in iocs.get("domains",[]): ioc_data.append([_cp("Domain"), _cp(d),  _cp("N/A")])
+    for h  in iocs.get("hashes", []): ioc_data.append([_cp("Hash"),   _cp(h),  _cp("N/A")])
+    for e  in iocs.get("emails", []): ioc_data.append([_cp("Email"),  _cp(e),  _cp("N/A")])
+    if len(ioc_data) > 1:
+        ioc_t = Table(ioc_data, colWidths=[70, 360, 80])
+        ioc_t.setStyle(_table_style(header_color="#333333", alt_row="#f5f5f5"))
+        story.append(ioc_t)
+    else:
+        story.append(Paragraph("No IOCs extracted.", caption_style))
+    story.append(Spacer(1, 12))
+
+    # ===== SSL =====
+    ssl_info = iocs.get("ssl_info", {})
+    if ssl_info:
+        story.append(Paragraph("SSL Certificate", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        ssl_fields = [
+            ("Issuer", ssl_info.get("issuer", "N/A")),
+            ("Subject", ssl_info.get("subject", "N/A")),
+            ("Valid From", ssl_info.get("validity_not_before", "N/A")),
+            ("Valid To", ssl_info.get("validity_not_after", "N/A")),
+            ("Serial", ssl_info.get("serial_number", "N/A")),
+        ]
+        san = ssl_info.get("san_domains", [])
+        if san:
+            ssl_fields.append(("SAN Domains", ", ".join(san[:10])))
+        ssl_rows = [[_cp(f), _cp(str(v))] for f, v in ssl_fields if v and v != "N/A"]
+        if ssl_rows:
+            ssl_t = Table([["Field", "Value"]] + ssl_rows, colWidths=[100, 410])
+            ssl_t.setStyle(_table_style(header_color="#1565C0", alt_row="#e8f4fd"))
+            story.append(ssl_t)
+        story.append(Spacer(1, 10))
+
+    # ===== OTX =====
+    otx = details.get("alienvault_otx", {})
+    if otx:
+        pulse_count = otx.get("pulse_info", {}).get("count", 0) or 0
+        pulses = otx.get("pulse_info", {}).get("pulses", [])[:8]
+        story.append(Paragraph("AlienVault OTX Threat Intelligence", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        story.append(Paragraph(f"<b>Pulse Count:</b> {pulse_count}", normal_style))
+        if pulses:
+            pulse_rows = [["Pulse Name", "Tags", "TLP"]]
+            for p in pulses:
+                tags = ", ".join(p.get("tags", [])[:5]) or "—"
+                pulse_rows.append([_cp(p.get("name", "Unnamed")), _cp(tags),
+                                    _cp((p.get("tlp") or "white").upper())])
+            pt = Table(pulse_rows, colWidths=[230, 180, 100])
+            pt.setStyle(_table_style(header_color="#1565C0", alt_row="#e8f4fd"))
+            story.append(pt)
+        story.append(Spacer(1, 10))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DEEP MODE SECTIONS
+    # ══════════════════════════════════════════════════════════════════════
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#b71c1c"), spaceAfter=4))
+    story.append(Paragraph("▌ Deep Intelligence Analysis", deep_heading_style))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#b71c1c"), spaceAfter=10))
+
+    # ===== THREAT ACTOR PROFILE =====
+    if actor_profile and not actor_profile.get("error"):
+        story.append(Paragraph("Threat Actor Profile", deep_heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+
+        threat_level = actor_profile.get("threat_level", "Unknown")
+        motivation   = actor_profile.get("motivation",    "Unknown")
+        narrative_ap = actor_profile.get("campaign_narrative", "")
+        tl_data = [["Threat Level", "Motivation"],
+                   [_cp(threat_level), _cp(motivation)]]
+        tl_t = Table(tl_data, colWidths=[255, 255])
+        tl_t.setStyle(_table_style(header_color="#b71c1c", alt_row="#fff5f5"))
+        story.append(tl_t)
+        story.append(Spacer(1, 6))
+
+        if narrative_ap:
+            story.append(Paragraph("Campaign Narrative", subheading_style))
+            story.append(Paragraph(_md_to_rl(narrative_ap), normal_style))
+            story.append(Spacer(1, 8))
+
+        candidates = actor_profile.get("threat_actor_candidates", [])
+        if candidates:
+            story.append(Paragraph("Threat Actor Candidates", subheading_style))
+            cand_data = [["Actor", "Confidence", "Reasoning"]]
+            for c in candidates:
+                cand_data.append([_cp(c.get("name", "?")),
+                                   _cp(c.get("confidence", "?")),
+                                   _cp(c.get("reasoning", ""))])
+            cand_t = Table(cand_data, colWidths=[120, 70, 320])
+            cand_t.setStyle(_table_style(header_color="#b71c1c", alt_row="#fff5f5"))
+            story.append(cand_t)
+            story.append(Spacer(1, 8))
+
+        # MITRE ATT&CK Tactics
+        tactics = actor_profile.get("mitre_tactics", [])
+        if tactics:
+            story.append(Paragraph("MITRE ATT&CK Tactics", subheading_style))
+            story.append(Paragraph(", ".join(tactics), normal_style))
+            story.append(Spacer(1, 6))
+
+        # MITRE ATT&CK Techniques
+        techniques = actor_profile.get("mitre_techniques", [])
+        if techniques:
+            story.append(Paragraph("MITRE ATT&CK Techniques", subheading_style))
+            tech_data = [["ID", "Technique", "Relevance"]]
+            for t in techniques:
+                tech_data.append([_cp(t.get("id", "?")),
+                                   _cp(t.get("name", "?")),
+                                   _cp(t.get("relevance", ""))])
+            tech_t = Table(tech_data, colWidths=[70, 160, 280])
+            tech_t.setStyle(_table_style(header_color="#555", alt_row="#f9f7f3"))
+            story.append(tech_t)
+            story.append(Spacer(1, 8))
+
+        # Recommended detections
+        detections = actor_profile.get("recommended_detections", [])
+        if detections:
+            story.append(Paragraph("Recommended Detections", subheading_style))
+            for d in detections:
+                story.append(Paragraph(f"• {_md_to_rl(str(d))}", normal_style))
+            story.append(Spacer(1, 8))
+
+    # ===== KILL-CHAIN TIMELINE =====
+    if kill_chain_data and not kill_chain_data.get("error"):
+        story.append(Paragraph("Behavioral Kill-Chain Reconstruction", deep_heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+
+        kc_narrative = kill_chain_data.get("narrative", "")
+        kc_duration  = kill_chain_data.get("attack_duration_estimate", "Unknown")
+        if kc_narrative:
+            story.append(Paragraph(_md_to_rl(kc_narrative), normal_style))
+        story.append(Paragraph(f"<b>Estimated Duration:</b> {kc_duration}", normal_style))
+        story.append(Spacer(1, 6))
+
+        phases = kill_chain_data.get("phases", [])
+        if phases:
+            phase_data = [["Phase", "Confidence", "Evidence"]]
+            for ph in phases:
+                phase_data.append([
+                    _cp(f"{ph.get('icon','')} {ph.get('phase','?')}"),
+                    _cp(ph.get("confidence", "?")),
+                    _cp(ph.get("evidence", "")),
+                ])
+            ph_t = Table(phase_data, colWidths=[130, 70, 310])
+            ph_t.setStyle(_table_style(header_color="#b71c1c", alt_row="#fff5f5"))
+            story.append(ph_t)
+        story.append(Spacer(1, 10))
+
+    # ===== YARA RULE =====
+    if yara_rule and yara_rule.strip():
+        story.append(Paragraph("Generated YARA Rule", deep_heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        for line in yara_rule.splitlines():
+            story.append(Paragraph(line.replace(' ', '\u00a0'), code_style))
+        story.append(Spacer(1, 10))
+
+    # ===== SNORT / SURICATA RULES =====
+    if snort_rule and snort_rule.strip():
+        story.append(Paragraph("Generated Snort / Suricata Rules", deep_heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        for line in snort_rule.splitlines():
+            story.append(Paragraph(line.replace(' ', '\u00a0'), code_style))
+        story.append(Spacer(1, 10))
+
+    # ===== RESEARCH ANNOTATIONS =====
+    if annotations:
+        story.append(Paragraph("Research Annotations", deep_heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        ann_data = [["Timestamp", "Tags", "Note"]]
+        for a in annotations:
+            ann_data.append([_cp(str(a.get("timestamp", ""))[:19]),
+                             _cp(str(a.get("tags", ""))),
+                             _cp(str(a.get("note", "")))])
+        ann_t = Table(ann_data, colWidths=[110, 100, 300])
+        ann_t.setStyle(_table_style(header_color="#4a5568", alt_row="#f7fafc"))
+        story.append(ann_t)
+        story.append(Spacer(1, 10))
+
+    # ===== FOOTER =====
+    story.append(Spacer(1, 20))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#ddd5c8"), spaceAfter=8))
+    story.append(Paragraph(
+        f"Lumina Shield \u00a9 2026  \u00b7  Deep Intelligence Report  \u00b7  "
+        f"Generated {datetime.now().strftime('%d %b %Y %H:%M')} UTC  \u00b7  "
+        "Verify all findings independently before taking action.",
+        footer_style,
+    ))
+
+    doc.build(story)
+    return path

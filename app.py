@@ -30,7 +30,7 @@ from agents.cartographer import build_genealogy_graph
 
 # Utils
 from utils.cache import get_cached_result, submission_hash
-from utils.report_generator import generate_pdf
+from utils.report_generator import generate_pdf, generate_deep_pdf
 
 whitelist_path = pathlib.Path(__file__).parent / "data" / "source_whitelist.json"
 with open(whitelist_path, "r", encoding="utf-8") as f:
@@ -614,7 +614,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------- Tabs --------------------
-tab1, tab2, tab3, tab4 = st.tabs(["🌍 Basic Mode", "🔍 Cyber Analyst", "🔬 Researcher", "📊 Global Dashboard"])
+tab1, tab2, tab3 = st.tabs(["🌍 Basic Mode", "🔍 Cyber Analyst", "📊 Global Dashboard"])
 
 
 def get_mock_threat_result(url):
@@ -1775,18 +1775,18 @@ with tab1:
             st.caption("Your analysis is private by default. Tick the checkbox above to contribute to the community map.")
 
 # ===============================
-# TAB 2: CYBER ANALYST
+# TAB 2: CYBER ANALYST — basic mode renderer
 # ===============================
-with tab2:
+def _render_cyber_basic_mode():
     st.markdown("""
     <div class='info-card'>
         <div class='ls-section-header' style='margin:0 0 0.3rem;'>
             <div class='icon-box'>🔬</div>
-            <span>Cyber Analyst — Deep Forensics & Threat Intelligence</span>
+            <span>Cyber Analyst — Basic Mode</span>
         </div>
         <p style='margin:0; color:#7a7268; font-size:0.88rem;'>
             Submit any URL, domain, IP address, or file hash for multi-engine enrichment:
-            VirusTotal, AbuseIPDB, WHOIS, Shodan, BGP, passive DNS, SSL analysis, and AI threat profiling.
+            multi-source intelligence feeds, domain & network analysis, passive DNS, SSL analysis, and AI threat profiling.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1875,13 +1875,15 @@ with tab2:
         _ai_cache_key = f"cyber_ai_{current_target}"
         if _ai_cache_key not in st.session_state:
             with st.spinner("🔬 Finalising threat analysis…"):
-                with _cf.ThreadPoolExecutor(max_workers=2) as _ai_ex:
-                    _fut_summary   = _ai_ex.submit(generate_threat_summary,         current_target, result)
-                    _fut_narrative = _ai_ex.submit(generate_narrative_intelligence,  current_target, result)
-                    st.session_state[_ai_cache_key] = {
-                        "summary":   _fut_summary.result(),
-                        "narrative": _fut_narrative.result(),
-                    }
+                # Narrative runs first — its top-scenario result is then passed into
+                # generate_threat_summary so both panels always tell the same story.
+                _narrative_result = generate_narrative_intelligence(current_target, result)
+                _summary_result   = generate_threat_summary(current_target, result,
+                                                            narrative_hint=_narrative_result)
+                st.session_state[_ai_cache_key] = {
+                    "summary":   _summary_result,
+                    "narrative": _narrative_result,
+                }
         summary_text   = st.session_state[_ai_cache_key]["summary"]
         narrative_data = st.session_state[_ai_cache_key]["narrative"]
 
@@ -2006,7 +2008,7 @@ with tab2:
         # ===== VIRUSTOTAL DETECTION OVERVIEW =====
         vt_stats = result.get("vt_stats", {})
         if vt_stats:
-            st.markdown("<div class='ls-section-header'><div class='icon-box'>🛡️</div><span>VirusTotal Detection Overview</span></div>", unsafe_allow_html=True)
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🛡️</div><span>Threat Detection Overview</span></div>", unsafe_allow_html=True)
             mal = vt_stats.get("malicious", 0)
             sus = vt_stats.get("suspicious", 0)
             harm = vt_stats.get("harmless", 0)
@@ -2097,7 +2099,7 @@ with tab2:
                 for vendor, category in cats.items():
                     st.markdown(f"- **{vendor}**: {category}")
             else:
-                st.info("No category data from VirusTotal.")
+                st.info("No category data available.")
 
         with col2:
             rep = result.get("vt_reputation", 0)
@@ -2123,7 +2125,7 @@ with tab2:
         last_anal = details.get("vt_last_analysis")
         times_sub = details.get("vt_times_submitted")
         if first_sub or last_anal:
-            with st.expander("📅 VirusTotal History"):
+            with st.expander("📅 Scan History"):
                 mcol1, mcol2, mcol3 = st.columns(3)
                 if first_sub:
                     try:
@@ -2144,13 +2146,13 @@ with tab2:
         abuse_data = result.get("details", {}).get("abuseipdb", {})
         for ip in result.get("ips", []):
             abuse_score = str(abuse_data.get("abuseConfidenceScore", "N/A")) if abuse_data else "N/A"
-            df_rows.append({"Type": "IP", "Value": ip, "AbuseIPDB Score": abuse_score})
+            df_rows.append({"Type": "IP", "Value": ip, "Abuse Score": abuse_score})
         for d in result.get("domains", []):
-            df_rows.append({"Type": "Domain", "Value": d, "AbuseIPDB Score": "N/A"})
+            df_rows.append({"Type": "Domain", "Value": d, "Abuse Score": "N/A"})
         for h in result.get("hashes", []):
-            df_rows.append({"Type": "Hash", "Value": h, "AbuseIPDB Score": "N/A"})
+            df_rows.append({"Type": "Hash", "Value": h, "Abuse Score": "N/A"})
         for e in result.get("emails", []):
-            df_rows.append({"Type": "Email", "Value": e, "AbuseIPDB Score": "N/A"})
+            df_rows.append({"Type": "Email", "Value": e, "Abuse Score": "N/A"})
 
         if df_rows:
             st.dataframe(pd.DataFrame(df_rows), use_container_width=True)
@@ -2158,7 +2160,7 @@ with tab2:
             st.info("No IOCs extracted.")
 
         # ===== WHOIS & OSINT DETAILS =====
-        with st.expander("🌐 WHOIS & OSINT Raw Details"):
+        with st.expander("🌐 Domain & Network Details"):
             st.json(result.get("details", {}))
 
         # ===== SSL CERTIFICATE DETAILS =====
@@ -2177,8 +2179,8 @@ with tab2:
         # ===== THREATFOX IOC DATABASE =====
         tf_hits = result.get("threatfox", [])
         if tf_hits:
-            st.markdown("<div class='ls-section-header'><div class='icon-box'>🕵️</div><span>ThreatFox IOC Intelligence</span></div>", unsafe_allow_html=True)
-            st.error(f"🚨 Found in **{len(tf_hits)}** ThreatFox entries!")
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🕵️</div><span>IOC Database Intelligence</span></div>", unsafe_allow_html=True)
+            st.error(f"🚨 Found in **{len(tf_hits)}** IOC database entries!")
             for hit in tf_hits[:10]:
                 c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
                 c1.markdown(f"**IOC:** `{hit.get('ioc_value','N/A')}`")
@@ -2186,16 +2188,16 @@ with tab2:
                 c3.markdown(f"**Malware:** {hit.get('malware','N/A')}")
                 c4.markdown(f"**Confidence:** {hit.get('confidence_level','N/A')}")
         else:
-            with st.expander("🕵️ ThreatFox IOC Database"):
-                st.success("✅ Not found in ThreatFox IOC database.")
+            with st.expander("🕵️ IOC Database"):
+                st.success("✅ Not found in the IOC database.")
 
         # ===== ALIENVAULT OTX =====
         otx_data = result.get("details", {}).get("alienvault_otx", {})
         if otx_data:
             pulse_count = otx_data.get("pulse_info", {}).get("count", 0) or 0
-            st.markdown("<div class='ls-section-header'><div class='icon-box'>🛸</div><span>AlienVault OTX Intelligence</span></div>", unsafe_allow_html=True)
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🛸</div><span>Threat Intelligence Feed</span></div>", unsafe_allow_html=True)
             if pulse_count:
-                st.error(f"🚨 **{pulse_count} threat intelligence pulses** reference this domain on AlienVault OTX!")
+                st.error(f"🚨 **{pulse_count} threat intelligence signals** reference this domain in our Global Threat Intelligence database!")
                 pulses = otx_data.get("pulse_info", {}).get("pulses", [])[:5]
                 for p in pulses:
                     with st.expander(f"📌 {p.get('name', 'Unnamed pulse')}  |  {p.get('created', '')[:10]}"):
@@ -2206,11 +2208,11 @@ with tab2:
                         st.write(f"**Malware Families:** {', '.join(mf_names) or 'None'}")
                         st.write(f"**TLP:** {p.get('tlp', 'white').upper()}")
             else:
-                with st.expander("🛸 AlienVault OTX Intelligence"):
-                    st.success("✅ No OTX pulses reference this target.")
+                with st.expander("🛸 Threat Intelligence Feed"):
+                    st.success("✅ No threat intelligence signals reference this target.")
         else:
-            with st.expander("🛸 AlienVault OTX Intelligence"):
-                st.info("OTX data not yet available for this target.")
+            with st.expander("🛸 Threat Intelligence Feed"):
+                st.info("Threat intelligence data not yet available for this target.")
 
         # ===== PDF EXPORT =====
         if st.button("📄 Generate PDF Report", key="pdf_btn"):
@@ -2222,13 +2224,13 @@ with tab2:
             with open(pdf_path, "rb") as f:
                 st.download_button("⬇️ Download Report", f, file_name="forensic_report.pdf", mime="application/pdf")
 
-# ===== TAB 3: RESEARCHER =====
-with tab3:
+# ===== DEEP MODE — full renderer (formerly Researcher tab) =====
+def _render_cyber_deep_mode():
     st.markdown("""
     <div class='info-card'>
         <div class='ls-section-header' style='margin:0 0 0.3rem;'>
-            <div class='icon-box'>🔭</div>
-            <span>Researcher Workbench — Advanced OSINT Intelligence</span>
+            <div class='icon-box'>🔍</div>
+            <span>Cyber Analyst — Deep Mode</span>
         </div>
         <p style='margin:0; color:#7a7268; font-size:0.88rem;'>
             Advanced OSINT pivoting &nbsp;·&nbsp; Passive DNS history &nbsp;·&nbsp; BGP / ASN intelligence &nbsp;·&nbsp;
@@ -2871,6 +2873,33 @@ with tab3:
                 st.code(st.session_state.r_snort_rule, language="text")
                 st.download_button("⬇️ Download Snort Rules", st.session_state.r_snort_rule, f"{r_domain}.rules")
 
+            # ── Deep Intelligence PDF ───────────────────────────────────────
+            st.markdown("---")
+            st.subheader("📑 Deep Intelligence PDF Report")
+            if st.button("📑 Generate Deep PDF Report", key="deep_pdf_btn"):
+                with st.spinner("Building comprehensive deep intelligence report…"):
+                    _deep_iocs = st.session_state.get("cyber_result") or {}
+                    _ai_cache  = st.session_state.get(f"cyber_ai_{r_domain}") or {}
+                    _deep_pdf_path = generate_deep_pdf(
+                        target=r_domain,
+                        iocs=_deep_iocs,
+                        summary_text=_ai_cache.get("summary"),
+                        narrative_data=_ai_cache.get("narrative"),
+                        actor_profile=st.session_state.get(f"actor_{r_domain}"),
+                        kill_chain_data=st.session_state.get(f"kill_chain_{r_domain}"),
+                        yara_rule=st.session_state.get("r_yara_rule"),
+                        snort_rule=st.session_state.get("r_snort_rule"),
+                        annotations=get_annotations(r_domain),
+                    )
+                with open(_deep_pdf_path, "rb") as _deep_f:
+                    st.download_button(
+                        "⬇️ Download Deep Intelligence Report",
+                        _deep_f,
+                        file_name=f"{r_domain}_deep_report.pdf",
+                        mime="application/pdf",
+                        key="deep_pdf_download",
+                    )
+
             # Standard exports
             st.markdown("---")
             e1, e2, e3 = st.columns(3)
@@ -2935,8 +2964,24 @@ with tab3:
         """, unsafe_allow_html=True)
         st.info("Enter a domain above to begin research.")
 
-# ===== TAB 4: DASHBOARD =====
-with tab4:
+# ===================================================
+# TAB 2: CYBER ANALYST  (Basic + Deep Mode dispatch)
+# ===================================================
+with tab2:
+    analyst_mode = st.radio(
+        "Analysis Mode",
+        ["🔍 Basic", "🔬 Deep Mode"],
+        horizontal=True,
+        key="analyst_mode",
+        help="Basic: rapid threat scan & IOC analysis  ·  Deep: full OSINT, infrastructure mapping, threat actor profiling & YARA forge",
+    )
+    if analyst_mode == "🔍 Basic":
+        _render_cyber_basic_mode()
+    else:
+        _render_cyber_deep_mode()
+
+# ===== TAB 3: GLOBAL DASHBOARD =====
+with tab3:
     st.markdown("""
     <div class='info-card'>
         <div class='ls-section-header' style='margin:0 0 0.3rem;'>

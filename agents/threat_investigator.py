@@ -676,8 +676,13 @@ STYLE GUIDELINES:
 - Do NOT hallucinate data or exaggerate risk"""
 
 
-def generate_threat_summary(url: str, iocs: dict) -> str:
-    """Generate an AI-powered threat analysis using a structured system prompt."""
+def generate_threat_summary(url: str, iocs: dict, narrative_hint: dict = None) -> str:
+    """Generate an AI-powered threat analysis using a structured system prompt.
+
+    narrative_hint: optional result from generate_narrative_intelligence — when supplied,
+    the summary verdict is forced to align with the top narrative scenario so both panels
+    tell the user the same story.
+    """
     try:
         import groq, os, json as _json
         api_key = os.getenv("GROQ_API_KEY")
@@ -730,6 +735,34 @@ def generate_threat_summary(url: str, iocs: dict) -> str:
             f"Extracted Domains: {', '.join(iocs.get('domains', [])[:5]) or 'None'}"
         )
 
+        # Build narrative alignment block (authoritative context for the summary LLM)
+        _narrative_ctx = ""
+        if narrative_hint and not narrative_hint.get("error") and narrative_hint.get("scenarios"):
+            _top = narrative_hint["scenarios"][0]
+            _top_name = _top.get("name", "Unknown")
+            _top_prob = _top.get("probability", 0)
+            _archetype = narrative_hint.get("campaign_archetype", "Unknown")
+            _ci_low  = narrative_hint.get("risk_confidence_low",  "?")
+            _ci_high = narrative_hint.get("risk_confidence_high", "?")
+            _nl = _top_name.lower()
+            if "benign" in _nl or "low risk" in _nl:
+                _vg = "verdict MUST be 'Benign'"
+            elif any(k in _nl for k in ["malware", "c2", "botnet", "exploit", "ransomware", "spyware"]):
+                _vg = "verdict MUST be 'Malicious'"
+            elif any(k in _nl for k in ["phishing", "credential", "scam", "fraud", "impersonation", "bec"]):
+                _vg = f"verdict MUST be '{'Malicious' if _top_prob >= 60 else 'Suspicious'}'"
+            else:
+                _vg = "verdict should reflect the scenario severity"
+            _narrative_ctx = (
+                f"\n5. Narrative Intelligence Pre-Analysis "
+                f"(AUTHORITATIVE — align your verdict with this):\n"
+                f"   Top scenario : \"{_top_name}\" ({_top_prob}% probability)\n"
+                f"   Archetype    : {_archetype}\n"
+                f"   Risk range   : {_ci_low}\u2013{_ci_high}/10\n"
+                f"   Rule         : {_vg}\n"
+                f"   Your detailed_explanation MUST support this scenario.\n"
+            )
+
         user_prompt = f"""INPUT DATA:
 
 1. User Content / Target:
@@ -743,7 +776,7 @@ def generate_threat_summary(url: str, iocs: dict) -> str:
 
 4. Heuristic Signals:
 {heuristics}
-
+{_narrative_ctx}
 ---
 
 Return a JSON object with exactly these keys:
