@@ -2328,11 +2328,11 @@ def _render_cyber_deep_mode():
                     st.error("❌ No DMARC (email forgery possible!)")
 
             st.markdown("---")
-            st.subheader("🕰️ Passive DNS History (CIRCL)")
+            st.subheader("🕰️ Historical DNS Lookups")
             with st.spinner("🕰️ Loading passive DNS history…"):
                 pdns_records = circl_pdns(r_domain)
             if pdns_records:
-                st.success(f"Found **{len(pdns_records)}** historical DNS entries")
+                st.success(f"Found **{len(pdns_records)}** historical DNS records")
                 pdns_rows = []
                 for rec in pdns_records[:50]:
                     import datetime as _dt
@@ -2346,19 +2346,19 @@ def _render_cyber_deep_mode():
                         "Count": rec.get("count", 1),
                     })
                 st.dataframe(pd.DataFrame(pdns_rows), use_container_width=True, height=300)
-                st.caption("Source: CIRCL Passive DNS — historical resolution records, updated hourly.")
+                st.caption("Historical DNS resolution records showing every IP this domain has ever pointed to.")
             else:
                 st.info("No passive DNS history found for this domain.")
 
             st.markdown("---")
-            st.subheader("🌍 Subdomains (crt.sh Certificate Transparency)")
-            with st.spinner("🌍 Scanning certificate transparency logs…"):
+            st.subheader("🌍 Discovered Subdomains")
+            with st.spinner("🌍 Scanning public certificate records for subdomains…"):
                 subs = crt_sh_subdomains(r_domain)
             if subs:
-                st.success(f"Found **{len(subs)}** subdomains in certificate logs!")
+                st.success(f"Found **{len(subs)}** subdomains from public certificate records!")
                 st.dataframe(pd.DataFrame(subs, columns=["Subdomain"]), use_container_width=True, height=300)
             else:
-                st.info("No subdomains found in certificate logs.")
+                st.info("No subdomains found in public certificate records.")
 
         # ── rtab3: OSINT Pivot ──────────────────────────────────────────────
         with rtab3:
@@ -2370,8 +2370,8 @@ def _render_cyber_deep_mode():
             )
             import socket as _sock
 
-            st.subheader("🔎 OSINT Pivot — Infrastructure Intelligence")
-            st.caption("Pivot from a domain → IPs → ASN → sibling domains → open ports → OTX pulses")
+            st.subheader("🔎 Infrastructure Intelligence")
+            st.caption("Pivot from a domain → IPs → network owner → co-hosted domains → exposed ports → global threat feeds")
 
             # Resolve IPs
             with st.spinner("🔍 Resolving IP addresses…"):
@@ -2406,8 +2406,8 @@ def _render_cyber_deep_mode():
 
                         # BGPView ASN details
                         with c2:
-                            st.markdown("**📡 BGP / ASN Intel**")
-                            with st.spinner("📡 Mapping network routing & ASN…"):
+                            st.markdown("**📡 Network Owner & Routing**")
+                            with st.spinner("📡 Mapping network routing & owner…"):
                                 bgp = bgpview_ip_info(ip)
                             prefixes = bgp.get("data", {}).get("prefixes", [])
                             if prefixes:
@@ -2422,8 +2422,8 @@ def _render_cyber_deep_mode():
 
                         # Shodan InternetDB (free)
                         with c3:
-                            st.markdown("**🔌 Open Ports & CVEs**")
-                            with st.spinner("🔌 Scanning exposed ports & CVEs…"):
+                            st.markdown("**🔌 Exposed Services & Vulnerabilities**")
+                            with st.spinner("🔌 Checking exposed services & known vulnerabilities…"):
                                 idb = shodan_internetdb(ip)
                             if idb and not idb.get("detail"):
                                 ports = idb.get("ports", [])
@@ -2442,25 +2442,24 @@ def _render_cyber_deep_mode():
                                 st.write("No port/CVE data (clean or private IP)")
 
                         # Reverse IP — sibling domains
-                        st.markdown("**🏘️ Sibling Domains (same IP)**")
-                        with st.spinner("🏘️ Discovering co-hosted domains…"):
+                        st.markdown("**🏘️ Co-Hosted Domains (same server)**")
+                        with st.spinner("🏘️ Finding other domains on the same server…"):
                             siblings = hackertarget_reverse_ip(ip)
                         if siblings:
-                            st.info(f"Found **{len(siblings)}** domains on the same IP")
+                            st.info(f"Found **{len(siblings)}** other domains sharing this server")
                             st.dataframe(
                                 pd.DataFrame(siblings, columns=["Domain"]),
                                 use_container_width=True, height=200,
                             )
                         else:
-                            st.write("No sibling domains found (or API limit reached).")
-
+                                st.write("No other domains found on this server.")
             st.markdown("---")
-            st.subheader("🛸 AlienVault OTX Intelligence")
+            st.subheader("🛸 Global Threat Intelligence Feeds")
             with st.spinner("🛸 Searching global threat intelligence feeds…"):
                 otx = otx_domain_report(r_domain)
             pulse_count = otx.get("pulse_info", {}).get("count", 0)
             if pulse_count:
-                st.error(f"🚨 **{pulse_count} threat intelligence pulses** reference this domain on AlienVault OTX!")
+                st.error(f"🚨 **{pulse_count} threat intelligence reports** reference this domain in global security databases!")
                 pulses = otx.get("pulse_info", {}).get("pulses", [])[:5]
                 for pulse in pulses:
                     st.markdown(f"""
@@ -2471,11 +2470,11 @@ def _render_cyber_deep_mode():
                         Modified: {pulse.get('modified','?')[:10]}</small>
                     </div>""", unsafe_allow_html=True)
             else:
-                st.success("✅ No OTX pulses reference this domain.")
+                st.success("✅ No threat intelligence reports reference this domain.")
 
             st.markdown("---")
-            st.subheader("📸 Web Screenshot (URLScan.io)")
-            with st.spinner("📸 Loading site screenshot…"):
+            st.subheader("📸 Live Website Screenshot")
+            with st.spinner("📸 Capturing live website screenshot…"):
                 ss = urlscan_latest_screenshot(r_domain)
             if ss and ss.get("screenshot_bytes"):
                 source = ss.get("source", "urlscan")
@@ -2484,13 +2483,13 @@ def _render_cyber_deep_mode():
                     is_mal = ss.get("malicious", False)
                     score = ss.get("score", 0)
                     st.caption(
-                        f"Scanned: {scanned} | URLScan Score: {score} | "
+                        f"Captured: {scanned} | Security Score: {score} | "
                         f"{'🚨 Flagged malicious' if is_mal else '✅ Not flagged'}"
                     )
-                    st.image(ss["screenshot_bytes"], caption="Latest URLScan.io snapshot", width='stretch')
-                    st.link_button("🔗 View Full URLScan Report", ss.get("scan_url", "#"))
+                    st.image(ss["screenshot_bytes"], caption="Latest website snapshot", width='stretch')
+                    st.link_button("🔗 View Full Security Scan Report", ss.get("scan_url", "#"))
                 else:
-                    st.caption("Live screenshot via thum.io (no URLScan history found)")
+                    st.caption("Live screenshot captured in real time")
                     st.image(ss["screenshot_bytes"], caption=f"Live render of https://{r_domain}", width='stretch')
             else:
                 st.info("Screenshot unavailable — the domain may block automated rendering.")
@@ -2521,11 +2520,11 @@ def _render_cyber_deep_mode():
                 st.info("No overlaps found in local submission history.")
 
             st.markdown("---")
-            st.subheader("🦠 URLHaus Malware Feed")
-            with st.spinner("🦠 Scanning malware distribution databases…"):
+            st.subheader("🦠 Malware Distribution History")
+            with st.spinner("🦠 Checking malware distribution databases…"):
                 uh = urlhaus_check(r_domain)
             if uh and uh.get("query_status") == "ok" and uh.get("urls"):
-                st.error(f"🚨 **{len(uh['urls'])} malware campaigns** used this domain!")
+                st.error(f"🚨 **{len(uh['urls'])} malware campaigns** have used this domain!")
                 try:
                     st.dataframe(
                         pd.DataFrame(uh["urls"])[["url", "url_status", "date_added", "threat"]],
@@ -2534,14 +2533,14 @@ def _render_cyber_deep_mode():
                 except Exception:
                     st.dataframe(pd.DataFrame(uh["urls"]))
             else:
-                st.success("✅ Clean on URLHaus.")
+                st.success("✅ No malware campaigns linked to this domain.")
 
             st.markdown("---")
-            st.subheader("🕵️ ThreatFox IOC Database")
-            with st.spinner("🕵️ Cross-referencing IOC threat databases…"):
+            st.subheader("🕵️ Known Threat Indicator Database")
+            with st.spinner("🕵️ Checking known threat indicator databases…"):
                 tf_hits = threatfox_domain_check(r_domain)
             if tf_hits:
-                st.error(f"🚨 Found in **{len(tf_hits)}** ThreatFox entries!")
+                st.error(f"🚨 Found in **{len(tf_hits)}** known threat indicator records!")
                 tf_rows = []
                 for hit in tf_hits[:20]:
                     tf_rows.append({
@@ -2553,7 +2552,7 @@ def _render_cyber_deep_mode():
                     })
                 st.dataframe(pd.DataFrame(tf_rows), width='stretch')
             else:
-                st.success("✅ Not found in ThreatFox IOC database.")
+                st.success("✅ Not found in any known threat indicator databases.")
 
             st.markdown("---")
             st.subheader("📈 Community Threat Timeline")
@@ -2933,17 +2932,17 @@ def _render_cyber_deep_mode():
             <div class='info-card' style='text-align:center;'>
                 <div style='font-size:2rem;'>🕰️</div>
                 <strong>Passive DNS History</strong>
-                <p style='color:#666;font-size:0.85rem;margin:0;'>CIRCL PDNS — see every IP this domain ever pointed to</p>
+                <p style='color:#666;font-size:0.85rem;margin:0;'>See every IP this domain has ever pointed to, historically</p>
             </div>
             <div class='info-card' style='text-align:center;'>
                 <div style='font-size:2rem;'>📡</div>
                 <strong>BGP / ASN Intelligence</strong>
-                <p style='color:#666;font-size:0.85rem;margin:0;'>BGPView — autonomous system, prefix, org attribution</p>
+                <p style='color:#666;font-size:0.85rem;margin:0;'>Identify the hosting company, country, and network block</p>
             </div>
             <div class='info-card' style='text-align:center;'>
                 <div style='font-size:2rem;'>🏘️</div>
                 <strong>Reverse IP Pivoting</strong>
-                <p style='color:#666;font-size:0.85rem;margin:0;'>Find all domains co-hosted on the same IP server</p>
+                <p style='color:#666;font-size:0.85rem;margin:0;'>Find all other domains sharing the same server</p>
             </div>
             <div class='info-card' style='text-align:center;'>
                 <div style='font-size:2rem;'>🎯</div>
@@ -2953,7 +2952,7 @@ def _render_cyber_deep_mode():
             <div class='info-card' style='text-align:center;'>
                 <div style='font-size:2rem;'>📸</div>
                 <strong>Web Screenshot</strong>
-                <p style='color:#666;font-size:0.85rem;margin:0;'>URLScan.io visual snapshot of the live page</p>
+                <p style='color:#666;font-size:0.85rem;margin:0;'>Visual snapshot of what the live website currently looks like</p>
             </div>
             <div class='info-card' style='text-align:center;'>
                 <div style='font-size:2rem;'>🚨</div>
