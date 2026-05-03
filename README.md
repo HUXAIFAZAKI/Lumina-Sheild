@@ -6,11 +6,12 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.29.0-FF4B4B?logo=streamlit)](https://streamlit.io/)
-[![Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash_Lite-4285F4?logo=google)](https://ai.google.dev/)
-[![Groq](https://img.shields.io/badge/Groq-Llama_3-orange)](https://groq.com/)
+[![Gemini](https://img.shields.io/badge/Google_Gemini-2.0_Flash-4285F4?logo=google)](https://ai.google.dev/)
+[![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-orange)](https://groq.com/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-RAG_Index-F7931E?logo=scikitlearn)](https://scikit-learn.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-> Detect fake news, phishing scams, manipulated content, and malicious URLs — with multilingual support and real-time threat intelligence for anyone, anywhere.
+> Detect fake news, phishing scams, manipulated content, and malicious URLs — with multilingual support, real-time threat intelligence, and an AI-powered email phishing scanner trained on 18,650 real-world samples.
 
 </div>
 
@@ -20,11 +21,11 @@
 
 - [Overview](#overview)
 - [Key Features](#key-features)
+- [Email Phishing Scanner](#email-phishing-scanner)
 - [Architecture](#architecture)
 - [Agent System](#agent-system)
 - [Threat Intelligence Integrations](#threat-intelligence-integrations)
 - [Verdict System](#verdict-system)
-- [Screenshots](#screenshots)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
@@ -46,19 +47,21 @@ Built for a global audience, it supports **English, Urdu (Roman & Nastaliq), Spa
 
 ### What it solves
 
-| Problem                                            | Lumina Shield's Approach                                                    |
-| -------------------------------------------------- | --------------------------------------------------------------------------- |
-| Viral fake news (WhatsApp, Telegram, social media) | AI decomposition into verifiable claims + LLM fact-checking                 |
-| Phishing / scam URLs                               | 12+ concurrent enrichment checks (VirusTotal, AbuseIPDB, WHOIS, DNS, SSL)   |
-| Manipulation tactics in content                    | Pattern detection: urgency, fear, fake authority, suppression, social proof |
-| Multilingual misinformation                        | Automatic language detection, transliteration, localized verdicts           |
-| Domain impersonation                               | Typosquatting detection, domain age checks, DNS genealogy graphs            |
+| Problem                                            | Lumina Shield's Approach                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Viral fake news (WhatsApp, Telegram, social media) | AI decomposition into verifiable claims + LLM fact-checking                           |
+| Phishing / scam URLs                               | 12+ concurrent enrichment checks (VirusTotal, AbuseIPDB, WHOIS, DNS, SSL)             |
+| Phishing emails                                    | RAG index of 18,650 labeled emails + LLM classifier, forensics & campaign fingerprint |
+| Manipulation tactics in content                    | Pattern detection: urgency, fear, fake authority, suppression, social proof           |
+| Multilingual misinformation                        | Automatic language detection, transliteration, localized verdicts                     |
+| Domain impersonation                               | Typosquatting detection, domain age checks, DNS genealogy graphs                      |
 
 ---
 
 ## Key Features
 
 - **🔍 Multi-Layer Fact Checking** — 5-layer verification pipeline from whitelist matching to LLM knowledge fallback
+- **📧 Email Phishing Scanner** — LLM + RAG classifier trained on 18,650 real phishing emails; 4 analysis features (see below)
 - **🦠 IOC Enrichment** — Asynchronous parallel enrichment of IPs, domains, hashes, and emails via 30+ sources
 - **🧠 Manipulation Detection** — Identifies 6 psychological manipulation tactics (URGENCY, FEAR, FAKE_AUTHORITY, SUPPRESSION, RELIGIOUS_FRAMING, SOCIAL_PROOF)
 - **🌐 Multilingual** — English, Urdu (Roman + Nastaliq), Arabic, Spanish — extensible to any language supported by Gemini
@@ -68,6 +71,63 @@ Built for a global audience, it supports **English, Urdu (Roman & Nastaliq), Spa
 - **📄 PDF Reports** — Full forensic report with branded layout, shareable PNG verdict cards, and QR codes
 - **⚡ Demo Mode** — Bypass API rate limits for testing and demonstrations
 - **💾 Disk Cache** — Persistent, namespace-based cache with expiry and purge UI
+
+---
+
+## Email Phishing Scanner
+
+Available as a dedicated **"📧 Email Phishing"** mode inside the Basic Mode tab. Paste any raw email (headers + body) and the pipeline runs four sequential analyses:
+
+### Feature 1 — 🎯 AI Email Classifier (LLM + RAG)
+
+A **TF-IDF RAG index** is built at startup from the full training corpus of **18,650 labeled emails** (7,328 phishing, 11,322 safe). For each new email:
+
+1. The top-6 most similar training emails are retrieved via cosine similarity
+2. Retrieved examples + their labels are injected into the LLM context
+3. **Groq `llama-3.3-70b-versatile`** classifies the email and returns:
+   - **Verdict**: `Phishing Email` or `Safe Email`
+   - **Confidence**: 0–100%
+   - **Risk Level**: Critical / High / Medium / Low
+   - **Red Flags**: specific reasons it looks like phishing
+   - **Safe Signals**: reasons it might be legitimate
+   - **RAG Examples**: the nearest training emails with similarity scores, shown in the UI
+
+### Feature 2 — 🧬 Phishing DNA: Campaign Fingerprint
+
+The LLM matches the email against **12 worldwide phishing archetypes** and identifies:
+
+| Field          | Example                                              |
+| -------------- | ---------------------------------------------------- |
+| Archetype      | `Credential Harvesting`, `Romance Scam`, `BEC`, etc. |
+| Campaign Name  | `Nigerian Prince Variant`, `PayPal Suspension Lure`  |
+| Tactics Used   | Urgency, impersonation, fake authority               |
+| Target Profile | Elderly users, corporate finance teams, etc.         |
+| Global Regions | Countries / regions where this campaign is active    |
+| Why Dangerous  | One-sentence real-world harm summary                 |
+
+Supported archetypes: Credential Harvesting · Financial Scam / Advance Fee Fraud · Lottery / Prize Notification · Romance / Emotional Manipulation · Urgent Account Alert · CEO / Executive Impersonation (BEC) · Package / Delivery Scam · Tech Support Scam · Adult / Sextortion · Malware / Attachment Lure · Charity / Disaster Relief Fraud · Job Offer Scam
+
+### Feature 3 — 🔬 Header & Link Forensics
+
+Regex-based extraction of email metadata combined with heuristic URL scoring:
+
+- **Header extraction** — From, Reply-To, Subject, To (mismatch between From and Reply-To is a strong phishing signal)
+- **Sender trust score** (0–100) based on free-domain use, missing sender, reply-to mismatch
+- **URL suspicion scoring** — Flags suspicious TLDs, IP-as-domain, URL shorteners, deceptive keywords, deep subdomains
+- **Keyword hits** — 20+ known phishing trigger words detected in body text
+- **LLM forensic assessment** — Plain-language explanation of what the AI sees in the metadata
+
+### Feature 4 — 🛡️ Personalised Safety Report
+
+Generates a human-friendly safety guide tailored to the detected campaign:
+
+- **Attacker Goal** — What the attacker is trying to achieve
+- **If You Comply** — Specific harm that would result from following the email's instructions
+- **Immediate Action Steps** — Numbered list of what to do right now
+- **WhatsApp Warning Message** — Ready-to-forward warning in the email's own language
+- **Full Safety Summary** — Written for non-technical readers
+
+> **LLM Stack:** Groq `llama-3.3-70b-versatile` is the primary inference engine (generous free tier, no quota issues). Gemini `gemini-2.0-flash` is the automatic fallback if Groq is unavailable.
 
 ---
 
@@ -118,7 +178,7 @@ Viral Message / URL
 
 ## Agent System
 
-Lumina Shield is built around **8 specialized agents** that operate in a coordinated pipeline:
+Lumina Shield is built around **9 specialized agents** that operate in a coordinated pipeline:
 
 ### 1. `Translator`
 
@@ -190,6 +250,16 @@ Two-pass web verification:
 1. **Gemini** performs grounded web searches and returns source metadata
 2. **Groq (Llama)** structures results into a JSON verdict with confidence score
 
+### 9. `Email Phishing Agent`
+
+LLM + RAG pipeline for email phishing analysis. See [Email Phishing Scanner](#email-phishing-scanner) for full details.
+
+- Builds a **TF-IDF index** (20,000 features, bigrams, sublinear TF) over 18,650 labeled emails at startup
+- `classify_email` — RAG retrieval + Groq LLM classification
+- `analyse_phishing_dna` — Campaign archetype + psychological tactics
+- `analyse_email_forensics` — Header/link heuristics + LLM assessment
+- `generate_safety_report` — Personalised action guide + shareable warning
+
 ---
 
 ## Threat Intelligence Integrations
@@ -259,8 +329,8 @@ A composite score (0–10) derived from:
 ### Prerequisites
 
 - Python 3.10 or higher
-- A **Google Gemini API key** (primary LLM)
-- A **Groq API key** (fallback LLM + query structuring)
+- A **Groq API key** (primary LLM — free tier, no quota issues)
+- A **Google Gemini API key** (fallback LLM + web search grounding)
 - Optional API keys for enhanced threat intelligence (see [Environment Variables](#environment-variables))
 
 ### Installation
@@ -289,8 +359,8 @@ Create a `.env` file in the root directory. A minimal setup requires only the fi
 
 ```env
 # ── Required ──────────────────────────────────────────────────────────────────
-GEMINI_API_KEY=your_google_gemini_api_key
-GROQ_API_KEY=your_groq_api_key
+GROQ_API_KEY=your_groq_api_key          # Primary LLM (llama-3.3-70b-versatile)
+GEMINI_API_KEY=your_google_gemini_api_key  # Fallback LLM + web search grounding
 
 # ── Threat Intelligence (optional but recommended) ────────────────────────────
 VIRUSTOTAL_API_KEYS=["your_vt_key_1", "your_vt_key_2"]
@@ -329,7 +399,7 @@ lumina-shield/
 ├── gemini_test.py                # Standalone Gemini search testing
 ├── requirements.txt
 │
-├── agents/                       # 8 specialized AI agents
+├── agents/                       # 9 specialized AI agents
 │   ├── translator.py             # Language detection & IOC extraction
 │   ├── decomposer.py             # Claim + CTA decomposition
 │   ├── misinfo_investigator.py   # 5-layer fact-checking engine
@@ -337,7 +407,8 @@ lumina-shield/
 │   ├── tactic_analyser.py        # Manipulation pattern detection
 │   ├── narrator.py               # Persona-specific output generation
 │   ├── cartographer.py           # Domain genealogy graph
-│   └── searcher.py               # Web search + LLM structuring
+│   ├── searcher.py               # Web search + LLM structuring
+│   └── email_phishing_agent.py   # LLM + RAG email phishing scanner (4 features)
 │
 ├── utils/
 │   ├── api_clients.py            # HTTP client wrappers
@@ -347,7 +418,9 @@ lumina-shield/
 │
 ├── data/
 │   ├── db.py                     # SQLite database schema & operations
-│   └── source_whitelist.json     # Curated trusted global source list
+│   ├── source_whitelist.json     # Curated trusted global source list
+│   └── email_csv/
+│       └── Phishing_Email.csv    # 18,650 labeled emails (RAG training corpus)
 │
 ├── lib/                          # Bundled frontend libraries
 │   ├── vis-9.1.2/                # vis-network (graph visualization)
@@ -390,8 +463,9 @@ Lumina Shield generates different output views depending on the user's role:
 | Category                | Technology                              |
 | ----------------------- | --------------------------------------- |
 | **UI Framework**        | Streamlit 1.29.0                        |
-| **Primary LLM**         | Google Gemini 2.5 Flash Lite            |
-| **Fallback LLM**        | Groq (Llama 3)                          |
+| **Primary LLM**         | Groq — Llama 3.3 70B Versatile          |
+| **Fallback LLM**        | Google Gemini 2.0 Flash                 |
+| **RAG / ML**            | scikit-learn TF-IDF (20k features)      |
 | **Database**            | SQLite (via Python `sqlite3`)           |
 | **Async Execution**     | Python `asyncio` + `concurrent.futures` |
 | **Graph Visualization** | NetworkX + Pyvis + vis-network.js       |
@@ -404,6 +478,7 @@ Lumina Shield generates different output views depending on the user's role:
 | **DNS Resolution**      | dnspython                               |
 | **Text Processing**     | regex, textwrap                         |
 | **Input Validation**    | validators                              |
+| **Email Training Data** | 18,650 labeled phishing/safe emails     |
 
 ---
 
