@@ -176,8 +176,20 @@ def generate_verdict_card_png(
         draw.text((34, y_now), line, font=fn_evid, fill=TEXT_SUB)
         y_now += 18
 
-    # ── Left accent stripe (subtle, like the app's card left-border) ─────
-    draw.rectangle([0, 0, 4, H], fill=acc["fill"])
+    # ── Left accent stripe (brand gradient, matches top bar) ─────────────
+    for y in range(H):
+        t = y / (H - 1)
+        if t < 0.5:
+            t2 = t * 2
+            r = int(GRAD_L[0] * (1 - t2) + GRAD_M[0] * t2)
+            g = int(GRAD_L[1] * (1 - t2) + GRAD_M[1] * t2)
+            b = int(GRAD_L[2] * (1 - t2) + GRAD_M[2] * t2)
+        else:
+            t2 = (t - 0.5) * 2
+            r = int(GRAD_M[0] * (1 - t2) + GRAD_R[0] * t2)
+            g = int(GRAD_M[1] * (1 - t2) + GRAD_R[1] * t2)
+            b = int(GRAD_M[2] * (1 - t2) + GRAD_R[2] * t2)
+        draw.line([(0, y), (4, y)], fill=(r, g, b))
 
     # ── Footer divider ────────────────────────────────────────────────────
     draw.line([(34, H - 42), (W - 34, H - 42)], fill=(229, 221, 208), width=1)

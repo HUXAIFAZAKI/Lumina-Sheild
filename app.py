@@ -608,7 +608,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------- Tabs --------------------
-tab1, tab2, tab3, tab4 = st.tabs(["🌍 Citizen", "🔍 Cyber Analyst", "🔬 Researcher", "📊 Global Dashboard"])
+tab1, tab2, tab3, tab4 = st.tabs(["🌍 Basic Mode", "🔍 Cyber Analyst", "🔬 Researcher", "📊 Global Dashboard"])
 
 
 def get_mock_threat_result(url):
@@ -649,7 +649,7 @@ with tab1:
     <div class='info-card'>
         <div class='ls-section-header' style='margin:0 0 0.3rem;'>
             <div class='icon-box'>🌍</div>
-            <span>Citizen — Real-Time Misinformation Verdict</span>
+            <span>Basic Mode — Real-Time Misinformation Verdict</span>
         </div>
         <p style='margin:0; color:#7a7268; font-size:0.88rem;'>
             Paste a message, upload a screenshot, or record a voice note.
@@ -660,7 +660,7 @@ with tab1:
 
     col_input, col_loc = st.columns([0.72, 0.28])
     with col_input:
-        input_mode = st.radio("Input type", ["📝 Text paste", "🖼️ Screenshot", "🎙️ Voice note"], horizontal=True, key="citizen_input")
+        input_mode = st.radio("Input type", ["📝 Text paste", "🖼️ Screenshot", "🎙️ Voice note", "📧 Email Phishing"], horizontal=True, key="citizen_input")
     with col_loc:
         _all_cities = get_all_city_names()  # 100+ cities from db.py
         user_location = st.selectbox("📍 Your Location", _all_cities,
@@ -724,11 +724,341 @@ with tab1:
             if st.session_state.voice_text_area != st.session_state.raw_text:
                 st.session_state.raw_text = st.session_state.voice_text_area
 
+    elif input_mode == "📧 Email Phishing":
+        st.markdown("""
+        <div class='info-card' style='padding:0.85rem 1.2rem; margin-bottom:0.9rem;'>
+            <strong>📧 AI-Powered Email Phishing Scanner</strong>
+            <p style='margin:4px 0 0; color:#7a7268; font-size:0.86rem;'>
+                Paste the full email text below — headers, body, links and all.
+                Lumina uses a <strong>RAG index of 18,650 real phishing samples</strong> combined with
+                an LLM to classify the email, fingerprint the campaign, dissect every link,
+                and generate your personalised safety guide.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
+        if "email_phishing_text" not in st.session_state:
+            st.session_state.email_phishing_text = ""
 
-    # ---- Analyze Button ----
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🔍 Analyze this message", key="analyze_citizen", use_container_width=False):
+        email_input = st.text_area(
+            "Paste email content here",
+            value=st.session_state.email_phishing_text,
+            height=220,
+            placeholder="From: support@paypa1-secure.tk\nSubject: URGENT: Your account has been suspended\n\nDear Customer, We noticed unusual activity...",
+            key="email_phishing_area",
+        )
+        if email_input != st.session_state.email_phishing_text:
+            st.session_state.email_phishing_text = email_input
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔍 Scan Email for Phishing", key="scan_email_btn", width='content'):
+            if not st.session_state.email_phishing_text.strip():
+                st.warning("⚠️ Please paste the email content first.")
+            else:
+                _email_txt = st.session_state.email_phishing_text
+                _ep_progress = st.progress(0, text="Initialising RAG index…")
+                _ep_status   = st.empty()
+
+                def _ep_step(n, total, label):
+                    _ep_progress.progress(n / total, text=label)
+                    _ep_status.markdown(f"""
+                    <div class='info-card' style='padding:0.75rem 1.1rem; margin:0;'>
+                        <ul class='ls-steps'>
+                            {"".join([
+                                f"<li class='ls-step done'>✅ {s}</li>" if i < n
+                                else f"<li class='ls-step running'>⏳ {s}</li>" if i == n - 1
+                                else f"<li class='ls-step pending'>○ {s}</li>"
+                                for i, s in enumerate([
+                                    "Loading RAG index",
+                                    "Classifying email — LLM + RAG",
+                                    "Phishing DNA fingerprinting",
+                                    "Header & link forensics",
+                                    "Generating safety report",
+                                ])
+                            ])}
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                from agents.email_phishing_agent import (
+                    classify_email, analyse_phishing_dna,
+                    analyse_email_forensics, generate_safety_report,
+                )
+
+                _ep_step(1, 5, "Loading RAG index…")
+                _ep_classification = classify_email(_email_txt)
+
+                _ep_step(2, 5, "Classifying with LLM + RAG…")
+                _ep_dna = analyse_phishing_dna(_email_txt, _ep_classification.get("rag_examples"))
+
+                _ep_step(3, 5, "Fingerprinting phishing campaign…")
+                _ep_forensics = analyse_email_forensics(_email_txt)
+
+                _ep_step(4, 5, "Running header & link forensics…")
+                _ep_safety = generate_safety_report(_email_txt, _ep_classification, _ep_dna)
+
+                _ep_step(5, 5, "Building safety report…")
+                _ep_progress.empty()
+                _ep_status.empty()
+
+                st.session_state["email_phishing_result"] = {
+                    "classification": _ep_classification,
+                    "dna": _ep_dna,
+                    "forensics": _ep_forensics,
+                    "safety": _ep_safety,
+                    "email_text": _email_txt,
+                }
+                st.rerun()
+
+    # ---- Render Email Phishing Results (persists across reruns) ----
+    if input_mode == "📧 Email Phishing" and "email_phishing_result" in st.session_state:
+        _ep = st.session_state["email_phishing_result"]
+        _cls = _ep["classification"]
+        _dna = _ep["dna"]
+        _fors = _ep["forensics"]
+        _safe = _ep["safety"]
+
+        # ─── Top verdict banner ───────────────────────────────────────
+        _ep_verdict = _cls.get("verdict", "Unknown")
+        _ep_conf    = _cls.get("confidence", 0)
+        _ep_risk    = _cls.get("risk_level", "Unknown")
+        _is_phishing = "Phishing" in _ep_verdict
+
+        _verdict_grad = (
+            "linear-gradient(135deg,#b71c1c,#e53935)" if _is_phishing
+            else "linear-gradient(135deg,#2e7d32,#43a047)"
+        )
+        _verdict_emoji = "🚨" if _is_phishing else "✅"
+        _risk_color = {
+            "Critical": "#b71c1c", "High": "#e65100",
+            "Medium": "#f57f17", "Low": "#2e7d32"
+        }.get(_ep_risk, "#9E9E9E")
+
+        st.markdown(f"""
+        <div style='text-align:center; padding:0.6rem 0 1.2rem;'>
+            <div class="overall-badge" style="background:{_verdict_grad}; font-size:1.3rem; padding:0.7rem 2.2rem;">
+                {_verdict_emoji}&nbsp; {_ep_verdict}
+            </div>
+            <div style='margin-top:0.6rem; display:flex; justify-content:center; gap:16px; flex-wrap:wrap;'>
+                <span style='font-size:0.85rem; font-weight:700; color:{_risk_color};
+                             background:{_risk_color}18; padding:4px 14px; border-radius:20px;'>
+                    ⚠️ Risk: {_ep_risk}
+                </span>
+                <span style='font-size:0.85rem; font-weight:700; color:#4a4540;
+                             background:#f0ede6; padding:4px 14px; border-radius:20px;'>
+                    🎯 Confidence: {_ep_conf}%
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"<div class='info-card'><p style='margin:0; font-size:0.93rem; line-height:1.6;'>💡 {_cls.get('summary','')}</p></div>", unsafe_allow_html=True)
+
+        # ─── 4 Feature Sub-tabs ────────────────────────────────────────
+        _ep_t1, _ep_t2, _ep_t3, _ep_t4 = st.tabs([
+            "🎯 Classifier",
+            "🧬 Phishing DNA",
+            "🔬 Header & Link Forensics",
+            "🛡️ Safety Report",
+        ])
+
+        # ── Tab 1: Classifier ──────────────────────────────────────────
+        with _ep_t1:
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🎯</div><span>AI Email Classifier — LLM + RAG</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:0.93rem;color:#7a7268;margin:0 0 0.9rem;'>RAG index searched <strong>{len(_cls.get('rag_examples', []))}</strong> nearest training emails from <strong>18,650</strong> worldwide samples.</p>", unsafe_allow_html=True)
+
+            _flags = _cls.get("red_flags", [])
+            _safe_sigs = _cls.get("safe_signals", [])
+
+            if _flags:
+                _flags_html = " ".join(
+                    f"<span style='background:#fde0e0;color:#9c1f1f;padding:4px 13px;border-radius:20px;font-size:0.88rem;font-weight:600;'>🚩 {f}</span>"
+                    for f in _flags
+                )
+                st.markdown(f"<p style='font-size:0.95rem;font-weight:700;margin:0.6rem 0 0.4rem;'>Red Flags Detected:</p>{_flags_html}", unsafe_allow_html=True)
+
+            if _safe_sigs:
+                _sigs_html = " ".join(
+                    f"<span style='background:#e8f5e9;color:#1b5e20;padding:4px 13px;border-radius:20px;font-size:0.88rem;font-weight:600;'>✅ {s}</span>"
+                    for s in _safe_sigs
+                )
+                st.markdown(f"<p style='font-size:0.95rem;font-weight:700;margin:0.8rem 0 0.4rem;'>Safe Signals:</p>{_sigs_html}", unsafe_allow_html=True)
+
+            # RAG examples
+            st.markdown("<p style='font-size:0.95rem;font-weight:700;margin:1rem 0 0.5rem;'>📚 Most Similar Training Emails (RAG Retrieved):</p>", unsafe_allow_html=True)
+            for ex in _cls.get("rag_examples", [])[:4]:
+                _ex_color = "#fde0e0" if "Phishing" in ex["label"] else "#e8f5e9"
+                _ex_badge_color = "#9c1f1f" if "Phishing" in ex["label"] else "#1b5e20"
+                _ex_emoji = "🚨" if "Phishing" in ex["label"] else "✅"
+                st.markdown(f"""
+                <div style='background:{_ex_color};border-radius:10px;padding:0.75rem 1.1rem;margin:0.4rem 0;'>
+                    <span style='font-size:0.88rem;font-weight:700;color:{_ex_badge_color};'>{_ex_emoji} {ex["label"]} — similarity {ex["score"]:.3f}</span>
+                    <p style='margin:6px 0 0;font-size:0.92rem;color:#4a4540;line-height:1.6;'>{ex["text"][:200]}…</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ── Tab 2: Phishing DNA ────────────────────────────────────────
+        with _ep_t2:
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🧬</div><span>Phishing DNA — Campaign Fingerprint</span></div>", unsafe_allow_html=True)
+
+            _arch = _dna.get("archetype", "Unknown")
+            _camp = _dna.get("campaign_name", "Unknown")
+            _regions = _dna.get("global_regions", [])
+            _region_str = "  •  ".join(f"🌍 {r}" for r in _regions)
+
+            st.markdown(f"""
+            <div class="tactic-card" style="border-left:4px solid #FF8C42;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                    <strong style="font-size:1.05rem;">🧬 {_camp}</strong>
+                    <span style="background:#fff0c2;color:#7a5500;padding:3px 12px;border-radius:20px;font-size:0.78rem;font-weight:700;">{_arch}</span>
+                </div>
+                <p style="margin:0 0 8px;color:#4a4540;font-size:0.88rem;line-height:1.6;">{_dna.get("why_dangerous","")}</p>
+                <p style="margin:0 0 4px;font-size:0.83rem;color:#7a7268;">👤 Target: <strong>{_dna.get("target_profile","General users")}</strong></p>
+                <p style="margin:0;font-size:0.82rem;color:#7a7268;">{_region_str}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            _tactics = _dna.get("tactics", [])
+            if _tactics:
+                st.markdown("**🎭 Psychological Tactics Used:**")
+                for t in _tactics:
+                    st.markdown(f"""
+                    <div class="tactic-card">
+                        <strong style="font-size:0.9rem;">🎭 {t.get("name","")}</strong>
+                        <p style="margin:5px 0 0;color:#7a7268;font-size:0.86rem;line-height:1.5;">{t.get("explanation","")}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        # ── Tab 3: Forensics ───────────────────────────────────────────
+        with _ep_t3:
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🔬</div><span>Header & Link Forensics</span></div>", unsafe_allow_html=True)
+
+            _headers = _fors.get("headers", {})
+            _overall_risk = _fors.get("overall_risk", 0)
+            _trust = _fors.get("sender_trust_score", 100)
+            _risk_fill_color = "#e53935" if _overall_risk > 70 else "#FF9800" if _overall_risk > 40 else "#4CAF50"
+
+            _hdr_col1, _hdr_col2 = st.columns(2)
+            with _hdr_col1:
+                st.markdown(f"""
+                <div class="info-card" style="padding:1rem 1.2rem;">
+                    <p style="margin:0 0 6px;font-weight:700;font-size:0.88rem;">📨 Extracted Headers</p>
+                    <p style="margin:2px 0;font-size:0.83rem;"><strong>From:</strong> {_headers.get("from","—") or "—"}</p>
+                    <p style="margin:2px 0;font-size:0.83rem;"><strong>Reply-To:</strong> {_headers.get("reply_to","—") or "—"}</p>
+                    <p style="margin:2px 0;font-size:0.83rem;"><strong>Subject:</strong> {_headers.get("subject","—") or "—"}</p>
+                    <p style="margin:2px 0;font-size:0.83rem;"><strong>To:</strong> {_headers.get("to","—") or "—"}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with _hdr_col2:
+                st.markdown(f"""
+                <div class="info-card" style="padding:1rem 1.2rem;">
+                    <p style="margin:0 0 6px;font-weight:700;font-size:0.88rem;">🛡️ Trust Scores</p>
+                    <p style="margin:2px 0 8px;font-size:0.83rem;">Sender Trust: <strong style="color:{'#2e7d32' if _trust>70 else '#e65100' if _trust>40 else '#b71c1c'};">{_trust}/100</strong></p>
+                    <div class="risk-gauge"><div class="risk-fill" style="width:{_trust}%;background:{'#4CAF50' if _trust>70 else '#FF9800' if _trust>40 else '#e53935'};"></div></div>
+                    <p style="margin:10px 0 4px;font-size:0.83rem;">Overall Risk: <strong style="color:{_risk_fill_color};">{_overall_risk}/100</strong></p>
+                    <div class="risk-gauge"><div class="risk-fill" style="width:{_overall_risk}%;background:{_risk_fill_color};"></div></div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Keyword hits
+            _kw_hits = _fors.get("keyword_hits", [])
+            if _kw_hits:
+                _kw_html = " ".join(
+                    f"<span style='background:#fff0c2;color:#7a5500;padding:2px 9px;border-radius:20px;font-size:0.73rem;font-weight:600;'>⚡ {k}</span>"
+                    for k in _kw_hits
+                )
+                st.markdown(f"**⚡ Suspicious Keywords Found:**<br>{_kw_html}", unsafe_allow_html=True)
+
+            # URL analysis
+            _urls = _fors.get("url_analysis", [])
+            if _urls:
+                st.markdown("**🔗 Link Analysis:**")
+                for ua in _urls:
+                    _u_risk = ua.get("suspicion_score", 0)
+                    _u_color = "#e53935" if _u_risk > 60 else "#FF9800" if _u_risk > 30 else "#4CAF50"
+                    _u_flags_html = " ".join(
+                        f"<span style='background:#fde0e0;color:#9c1f1f;padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:600;'>⚠️ {fl}</span>"
+                        for fl in ua.get("flags", [])
+                    )
+                    st.markdown(f"""
+                    <div class="verdict-card" style="border-left:4px solid {_u_color}; padding:0.8rem 1rem; margin:0.4rem 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:0.82rem;font-weight:700;color:{_u_color};">Suspicion {_u_risk}/100</span>
+                        </div>
+                        <div class="risk-gauge"><div class="risk-fill" style="width:{_u_risk}%;background:{_u_color};"></div></div>
+                        <p style="margin:6px 0 2px;font-size:0.8rem;font-family:monospace;color:#4a4540;">{ua.get("url","")[:80]}</p>
+                        <div style="margin-top:5px;">{_u_flags_html}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            elif not _headers.get("urls"):
+                st.info("No URLs detected in this email.")
+
+            # LLM assessment
+            if _fors.get("llm_assessment"):
+                st.markdown("**🤖 AI Forensic Assessment:**")
+                st.info(_fors["llm_assessment"])
+
+        # ── Tab 4: Safety Report ───────────────────────────────────────
+        with _ep_t4:
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>🛡️</div><span>Your Personalised Safety Report</span></div>", unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div class="ls-card" style="border-left:4px solid {'#e53935' if _is_phishing else '#2e7d32'};">
+                <p style="margin:0 0 6px;font-weight:700;font-size:0.95rem;">🎯 What the Attacker Wants</p>
+                <p style="margin:0;font-size:0.9rem;color:#4a4540;line-height:1.6;">{_safe.get("attacker_goal","")}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div class="ls-card" style="border-left:4px solid #e65100;">
+                <p style="margin:0 0 6px;font-weight:700;font-size:0.95rem;">⚠️ If You Follow These Instructions…</p>
+                <p style="margin:0;font-size:0.9rem;color:#4a4540;line-height:1.6;">{_safe.get("if_you_comply","")}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            _actions = _safe.get("immediate_actions", [])
+            if _actions:
+                st.markdown("**✅ What To Do Right Now:**")
+                for i, act in enumerate(_actions, 1):
+                    st.markdown(f"""
+                    <div style='display:flex;align-items:flex-start;gap:10px;padding:6px 0;'>
+                        <span style='background:linear-gradient(135deg,#E5A100,#FF8C42);color:#fff;font-weight:700;
+                                     border-radius:50%;width:24px;height:24px;display:flex;align-items:center;
+                                     justify-content:center;font-size:0.78rem;flex-shrink:0;'>{i}</span>
+                        <span style='font-size:0.9rem;color:#1a1714;line-height:1.5;'>{act}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            # Full report
+            if _safe.get("report_text"):
+                st.markdown("**📄 Full Safety Summary:**")
+                st.info(_safe["report_text"])
+
+            # Shareable warning
+            st.markdown("<div class='ls-section-header'><div class='icon-box'>📤</div><span>Forward This Warning to Your Contacts</span></div>", unsafe_allow_html=True)
+            st.caption("Copy this message and send it to anyone who may receive the same email.")
+            st.code(_safe.get("warning_message", ""), language="text")
+
+        # ─── Community Reporting for Email Scams ───────────────────────
+        st.markdown("<hr class='ls-divider'>", unsafe_allow_html=True)
+        st.markdown("<div class='ls-section-header'><div class='icon-box'>🌍</div><span>Report This Email Scam to Community</span></div>", unsafe_allow_html=True)
+        _ep_share = st.checkbox("📢 Share this email scam verdict with the community map", key="ep_share_consent")
+        if _ep_share:
+            _ep_cities = get_all_city_names()
+            _ep_city = st.selectbox("📍 Report from city", _ep_cities, key="ep_report_city",
+                                    index=_ep_cities.index("Karachi") if "Karachi" in _ep_cities else 0)
+            if st.button("📤 Submit Email Scam Report", key="ep_submit_report"):
+                sub_id = log_submission(_ep["email_text"], "EmailPhishing", "app")
+                _ep_verdict_val = "SCAM" if _is_phishing else "TRUE"
+                log_heatmap(_ep_city, "email_phishing", _ep_verdict_val)
+                if _is_phishing and not check_feed_duplicate(_ep["email_text"][:100]):
+                    log_to_feed(sub_id, "SCAM", _ep["email_text"][:100] + "…")
+                st.success(f"✅ Email scam reported from **{_ep_city}**. Thank you!")
+
+    # ---- Analyze Button (non-email modes) ----
+    if input_mode != "📧 Email Phishing":
+        st.markdown("<br>", unsafe_allow_html=True)
+    if input_mode != "📧 Email Phishing" and st.button("🔍 Analyze this message", key="analyze_citizen", width='content'):
         if not st.session_state.raw_text.strip():
             st.warning("⚠️ Please paste or upload some content first.")
         else:
@@ -1092,14 +1422,14 @@ with tab1:
                 )
                 _png_col1, _png_col2 = st.columns([0.5, 0.5])
                 with _png_col1:
-                    st.image(_card_png, caption="Preview — right-click to copy", use_container_width=True)
+                    st.image(_card_png, caption="Preview — right-click to copy", width='stretch')
                 with _png_col2:
                     st.download_button(
                         "⬇️ Download Verdict Card (PNG)",
                         data=_card_png,
                         file_name=f"lumina_verdict_{card['overall_label'].lower()}.png",
                         mime="image/png",
-                        use_container_width=True,
+                        width='stretch',
                     )
                     st.caption("Share this card on WhatsApp, Twitter/X, or Instagram Stories to spread awareness and protect others.")
             except Exception as _e:
@@ -1322,7 +1652,7 @@ with tab1:
                 f"Key evidence: {_ev_ctx[:400]}. "
                 f"Original message snippet: {raw_text[:300]}. "
                 f"Answer follow-up questions in simple, friendly language. "
-                f"If the user writes in Urdu or Roman Urdu, reply in Roman Urdu. "
+                f"If the user writes in Urdu, Roman Urdu, reply in Roman Urdu or in the same language as of the original message else in english"
                 f"Keep answers under 4 sentences."
             )
 
@@ -1386,14 +1716,14 @@ with tab1:
             )
             _png_col1, _png_col2 = st.columns([0.5, 0.5])
             with _png_col1:
-                st.image(_card_png, caption="Preview — right-click to copy", use_container_width=True)
+                st.image(_card_png, caption="Preview — right-click to copy", width='stretch')
             with _png_col2:
                 st.download_button(
                     "⬇️ Download Verdict Card (PNG)",
                     data=_card_png,
                     file_name=f"lumina_verdict_{card['overall_label'].lower()}.png",
                     mime="image/png",
-                    use_container_width=True,
+                    width='stretch',
                 )
                 st.caption("Share this card on WhatsApp, Twitter/X, or Instagram Stories to spread awareness and protect others.")
         except Exception as _e:
@@ -1469,31 +1799,39 @@ with tab2:
             target_value = cyber_target["value"]
             target_kind = cyber_target["kind"]
 
-            _progress = st.progress(0, text="Starting parallel enrichment…")
+            _progress = st.progress(0, text="Initializing threat scan…")
             _status = st.empty()
             _steps_ca = [
-                "Running VirusTotal scan",
-                "Checking AbuseIPDB reputation",
-                "Fetching WHOIS & SSL intel",
-                "Querying Shodan & BGP data",
-                "Extracting IOCs",
-                "AI Executive Summary",
+                "Initializing multi-engine threat scan",
+                "Querying global threat intelligence",
+                "Cross-referencing reputation databases",
+                "Mapping network topology & IP data",
+                "Enriching with network intelligence",
+                "Gathering passive DNS & subdomain data",
+                "Running AI-powered forensic analysis",
             ]
-            def _ca_step(n):
-                _progress.progress(n / len(_steps_ca), text=_steps_ca[min(n, len(_steps_ca)-1)])
+            def _ca_step(n, total=7, label=""):
+                step_idx = min(n, len(_steps_ca) - 1)
+                frac = min(1.0, n / len(_steps_ca))
+                _progress.progress(frac, text=_steps_ca[step_idx])
                 items = "".join([
-                    f"<li class='ls-step {'done' if i < n else 'running' if i == n else 'pending'}'>{'✅' if i < n else '⏳' if i == n else '○'} {s}</li>"
+                    "<li class='ls-step done'>✅ " + s + "</li>" if i < n
+                    else "<li class='ls-step running'>⏳ " + s + "</li>" if i == n
+                    else "<li class='ls-step pending'>○ " + s + "</li>"
                     for i, s in enumerate(_steps_ca)
                 ])
-                _status.markdown(f"<div class='info-card' style='padding:0.9rem 1.2rem;margin:0;'><ul class='ls-steps'>{items}</ul></div>", unsafe_allow_html=True)
+                _status.markdown("<div class='info-card' style='padding:0.9rem 1.2rem;margin:0;'><ul class='ls-steps'>" + items + "</ul></div>", unsafe_allow_html=True)
 
             _ca_step(0)
             if st.session_state.get('demo_mode'):
                 result = get_mock_threat_result(target_value)
+                _ca_step(len(_steps_ca))
             else:
-                result = investigate_threat_cached(file_hash=target_value) if target_kind == "hash" else investigate_threat_cached(url=target_value)
-
-            _ca_step(len(_steps_ca))
+                result = investigate_threat_cached(
+                    file_hash=target_value if target_kind == "hash" else None,
+                    url=target_value if target_kind != "hash" else None,
+                    progress_callback=_ca_step,
+                )
             _progress.empty()
             _status.empty()
 
@@ -1527,13 +1865,26 @@ with tab2:
         risk_color = "#4CAF50" if risk < 3 else "#FF9800" if risk < 6 else "#f44336" if risk < 8 else "#b71c1c"
         risk_pct = risk * 10
 
-        # Run both AI calls in parallel to save time
-        with st.spinner("🧠 Running AI threat analysis…"):
-            with _cf.ThreadPoolExecutor(max_workers=2) as _ai_ex:
-                _fut_summary   = _ai_ex.submit(generate_threat_summary,         current_target, result)
-                _fut_narrative = _ai_ex.submit(generate_narrative_intelligence,  current_target, result)
-                summary_text   = _fut_summary.result()
-                narrative_data = _fut_narrative.result()
+        # AI summary/narrative — cached per target so the spinner doesn't fire on every re-render
+        _ai_cache_key = f"cyber_ai_{current_target}"
+        if _ai_cache_key not in st.session_state:
+            with st.spinner("🔬 Finalising threat analysis…"):
+                with _cf.ThreadPoolExecutor(max_workers=2) as _ai_ex:
+                    _fut_summary   = _ai_ex.submit(generate_threat_summary,         current_target, result)
+                    _fut_narrative = _ai_ex.submit(generate_narrative_intelligence,  current_target, result)
+                    st.session_state[_ai_cache_key] = {
+                        "summary":   _fut_summary.result(),
+                        "narrative": _fut_narrative.result(),
+                    }
+        summary_text   = st.session_state[_ai_cache_key]["summary"]
+        narrative_data = st.session_state[_ai_cache_key]["narrative"]
+
+        # Convert AI markdown bold (**text**) and newlines to HTML so they render correctly
+        def _md_to_html(text: str) -> str:
+            import re as _re
+            text = _re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
+            text = text.replace('\n', '<br>')
+            return text
 
         c_risk, c_summary = st.columns([0.35, 0.65])
         with c_risk:
@@ -1554,7 +1905,7 @@ with tab2:
 
         with c_summary:
             st.markdown("<div class='ls-section-header'><div class='icon-box'>🤖</div><span>AI Executive Summary</span></div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='info-card' style='margin-top:0;'><p style='margin:0;line-height:1.65;font-size:0.9rem;'>{summary_text}</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='info-card' style='margin-top:0;'><p style='margin:0;line-height:1.65;font-size:0.9rem;'>{_md_to_html(summary_text)}</p></div>", unsafe_allow_html=True)
 
         # ===== NARRATIVE INTELLIGENCE SCORE =====
         if narrative_data and not narrative_data.get("error") and narrative_data.get("scenarios"):
@@ -1916,7 +2267,7 @@ with tab3:
         # ── rtab1: Threat Genealogy Graph ──────────────────────────────────
         with rtab1:
             st.subheader("🕸️ Threat Genealogy Graph")
-            with st.spinner("Building graph..."):
+            with st.spinner("🕸️ Mapping threat infrastructure graph…"):
                 try:
                     gh, gx = build_genealogy_graph(r_domain)
                     st.components.v1.html(gh, height=580)
@@ -1939,7 +2290,7 @@ with tab3:
 
             with col_dns:
                 st.subheader("📡 Live DNS Records")
-                with st.spinner("Resolving DNS..."):
+                with st.spinner("📡 Looking up live DNS records…"):
                     dns_d = dns_resolve_all(r_domain)
                 if any(dns_d.values()):
                     for rt in ["A", "AAAA", "MX", "NS", "CNAME", "TXT"]:
@@ -1953,7 +2304,7 @@ with tab3:
 
             with col_email:
                 st.subheader("📧 Email Security")
-                with st.spinner("Checking SPF / DMARC..."):
+                with st.spinner("📧 Checking email security posture…"):
                     email_sec = email_security_check(r_domain)
                 spf = email_sec.get("spf")
                 dmarc = email_sec.get("dmarc")
@@ -1970,7 +2321,7 @@ with tab3:
 
             st.markdown("---")
             st.subheader("🕰️ Passive DNS History (CIRCL)")
-            with st.spinner("Fetching historical DNS from CIRCL PDNS..."):
+            with st.spinner("🕰️ Loading passive DNS history…"):
                 pdns_records = circl_pdns(r_domain)
             if pdns_records:
                 st.success(f"Found **{len(pdns_records)}** historical DNS entries")
@@ -1993,7 +2344,7 @@ with tab3:
 
             st.markdown("---")
             st.subheader("🌍 Subdomains (crt.sh Certificate Transparency)")
-            with st.spinner("Querying crt.sh..."):
+            with st.spinner("🌍 Scanning certificate transparency logs…"):
                 subs = crt_sh_subdomains(r_domain)
             if subs:
                 st.success(f"Found **{len(subs)}** subdomains in certificate logs!")
@@ -2015,7 +2366,7 @@ with tab3:
             st.caption("Pivot from a domain → IPs → ASN → sibling domains → open ports → OTX pulses")
 
             # Resolve IPs
-            with st.spinner("Resolving IPs..."):
+            with st.spinner("🔍 Resolving IP addresses…"):
                 dns_res = _dns_all(r_domain)
                 ips = dns_res.get("A", [])
                 try:
@@ -2033,7 +2384,7 @@ with tab3:
                         c1, c2, c3 = st.columns(3)
 
                         # Geolocation
-                        with st.spinner("Getting geo info..."):
+                        with st.spinner("📍 Pinpointing server location…"):
                             geo = ip_geolocation(ip)
                         with c1:
                             st.markdown("**📍 Geolocation**")
@@ -2048,7 +2399,7 @@ with tab3:
                         # BGPView ASN details
                         with c2:
                             st.markdown("**📡 BGP / ASN Intel**")
-                            with st.spinner("BGPView lookup..."):
+                            with st.spinner("📡 Mapping network routing & ASN…"):
                                 bgp = bgpview_ip_info(ip)
                             prefixes = bgp.get("data", {}).get("prefixes", [])
                             if prefixes:
@@ -2064,7 +2415,7 @@ with tab3:
                         # Shodan InternetDB (free)
                         with c3:
                             st.markdown("**🔌 Open Ports & CVEs**")
-                            with st.spinner("Shodan InternetDB..."):
+                            with st.spinner("🔌 Scanning exposed ports & CVEs…"):
                                 idb = shodan_internetdb(ip)
                             if idb and not idb.get("detail"):
                                 ports = idb.get("ports", [])
@@ -2084,7 +2435,7 @@ with tab3:
 
                         # Reverse IP — sibling domains
                         st.markdown("**🏘️ Sibling Domains (same IP)**")
-                        with st.spinner("HackerTarget reverse IP..."):
+                        with st.spinner("🏘️ Discovering co-hosted domains…"):
                             siblings = hackertarget_reverse_ip(ip)
                         if siblings:
                             st.info(f"Found **{len(siblings)}** domains on the same IP")
@@ -2097,7 +2448,7 @@ with tab3:
 
             st.markdown("---")
             st.subheader("🛸 AlienVault OTX Intelligence")
-            with st.spinner("Fetching OTX pulses..."):
+            with st.spinner("🛸 Searching global threat intelligence feeds…"):
                 otx = otx_domain_report(r_domain)
             pulse_count = otx.get("pulse_info", {}).get("count", 0)
             if pulse_count:
@@ -2116,7 +2467,7 @@ with tab3:
 
             st.markdown("---")
             st.subheader("📸 Web Screenshot (URLScan.io)")
-            with st.spinner("Fetching screenshot..."):
+            with st.spinner("📸 Loading site screenshot…"):
                 ss = urlscan_latest_screenshot(r_domain)
             if ss and ss.get("screenshot_bytes"):
                 source = ss.get("source", "urlscan")
@@ -2128,11 +2479,11 @@ with tab3:
                         f"Scanned: {scanned} | URLScan Score: {score} | "
                         f"{'🚨 Flagged malicious' if is_mal else '✅ Not flagged'}"
                     )
-                    st.image(ss["screenshot_bytes"], caption="Latest URLScan.io snapshot", use_container_width=True)
+                    st.image(ss["screenshot_bytes"], caption="Latest URLScan.io snapshot", width='stretch')
                     st.link_button("🔗 View Full URLScan Report", ss.get("scan_url", "#"))
                 else:
                     st.caption("Live screenshot via thum.io (no URLScan history found)")
-                    st.image(ss["screenshot_bytes"], caption=f"Live render of https://{r_domain}", use_container_width=True)
+                    st.image(ss["screenshot_bytes"], caption=f"Live render of https://{r_domain}", width='stretch')
             else:
                 st.info("Screenshot unavailable — the domain may block automated rendering.")
 
@@ -2140,11 +2491,11 @@ with tab3:
             st.subheader("🏘️ Typosquatting Detection")
             from agents.cartographer import generate_typosquatting
             if st.button("🔍 Check Typosquatting", key="typo_btn"):
-                with st.spinner("Generating permutations and probing DNS..."):
+                with st.spinner("🔄 Generating typosquat permutations & probing DNS…"):
                     active_typos = generate_typosquatting(r_domain)
                 if active_typos:
                     st.warning(f"🚨 Found **{len(active_typos)}** active typosquatting domains!")
-                    st.dataframe(pd.DataFrame(active_typos), use_container_width=True)
+                    st.dataframe(pd.DataFrame(active_typos), width="stretch")
                 else:
                     st.success("✅ No active typosquatting domains found.")
 
@@ -2157,20 +2508,20 @@ with tab3:
             matches = campaign_similarity({"domains": [r_domain]})
             if matches:
                 st.warning(f"⚠️ **{len(matches)}** infrastructure overlaps with previous submissions!")
-                st.dataframe(pd.DataFrame(matches), use_container_width=True)
+                st.dataframe(pd.DataFrame(matches), width="stretch")
             else:
                 st.info("No overlaps found in local submission history.")
 
             st.markdown("---")
             st.subheader("🦠 URLHaus Malware Feed")
-            with st.spinner("Checking URLHaus..."):
+            with st.spinner("🦠 Scanning malware distribution databases…"):
                 uh = urlhaus_check(r_domain)
             if uh and uh.get("query_status") == "ok" and uh.get("urls"):
                 st.error(f"🚨 **{len(uh['urls'])} malware campaigns** used this domain!")
                 try:
                     st.dataframe(
                         pd.DataFrame(uh["urls"])[["url", "url_status", "date_added", "threat"]],
-                        use_container_width=True,
+                        width="stretch",
                     )
                 except Exception:
                     st.dataframe(pd.DataFrame(uh["urls"]))
@@ -2179,7 +2530,7 @@ with tab3:
 
             st.markdown("---")
             st.subheader("🕵️ ThreatFox IOC Database")
-            with st.spinner("Searching ThreatFox..."):
+            with st.spinner("🕵️ Cross-referencing IOC threat databases…"):
                 tf_hits = threatfox_domain_check(r_domain)
             if tf_hits:
                 st.error(f"🚨 Found in **{len(tf_hits)}** ThreatFox entries!")
@@ -2192,7 +2543,7 @@ with tab3:
                         "Confidence": hit.get("confidence_level","?"),
                         "First Seen": hit.get("first_seen","?")[:10] if hit.get("first_seen") else "?",
                     })
-                st.dataframe(pd.DataFrame(tf_rows), use_container_width=True)
+                st.dataframe(pd.DataFrame(tf_rows), width='stretch')
             else:
                 st.success("✅ Not found in ThreatFox IOC database.")
 
@@ -2209,7 +2560,7 @@ with tab3:
                     td = df_f.groupby(["date", "verdict"]).size().reset_index(name="count")
                     fig = px.bar(td, x="date", y="count", color="verdict", title="Community Reports Timeline",
                                  template="plotly_white")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 else:
                     st.info("No community data yet.")
             except Exception as e:
@@ -2611,7 +2962,7 @@ with tab4:
             c = row["city"]
             if c in GLOBAL_CITY_COORDS:
                 folium.CircleMarker(location=GLOBAL_CITY_COORDS[c], radius=row["n"]*3+4, color="#E5A100", fill=True, fill_color="#E5A100", fill_opacity=0.6, popup=f"{c}: {row['n']}").add_to(m)
-        st_folium(m, use_container_width=True, height=450, returned_objects=[])
+        st_folium(m, width='stretch', height=450, returned_objects=[])
         st.subheader("📈 Threats Over Time")
         df["date"] = pd.to_datetime(df["date"], errors="coerce"); df = df.dropna(subset=["date"]); df["d2"] = df["date"].dt.date
         trend = df.groupby(["d2","verdict"]).size().reset_index(name="count")
@@ -2619,11 +2970,11 @@ with tab4:
             fig = px.area(trend, x="d2", y="count", color="verdict", title="Threat Reports Over Time", template="plotly_white",
                 color_discrete_map={"FAKE":"#f44336","SCAM":"#FF9800","MANIPULATED":"#FFB347","FALSE":"#e53935","MIXTURE":"#FFC107","TRUE":"#4CAF50"})
             fig.update_layout(xaxis_title="Date", yaxis_title="Reports", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         st.subheader("📊 Breakdown")
         bc1,bc2 = st.columns(2)
-        with bc1: st.plotly_chart(px.pie(df.groupby("verdict").size().reset_index(name="n"), names="verdict", values="n", title="By Verdict", template="plotly_white"), use_container_width=True)
-        with bc2: st.plotly_chart(px.bar(df.groupby("category").size().reset_index(name="n"), x="category", y="n", title="By Category", color="n", color_continuous_scale=["#FFF8E7","#E5A100"], template="plotly_white"), use_container_width=True)
+        with bc1: st.plotly_chart(px.pie(df.groupby("verdict").size().reset_index(name="n"), names="verdict", values="n", title="By Verdict", template="plotly_white"), width='stretch')
+        with bc2: st.plotly_chart(px.bar(df.groupby("category").size().reset_index(name="n"), x="category", y="n", title="By Category", color="n", color_continuous_scale=["#FFF8E7","#E5A100"], template="plotly_white"),  width='stretch')
     else:
         st.info("📭 No data yet. Submit a message from the Citizen tab to populate the dashboard.")
     # Community Feed

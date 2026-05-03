@@ -149,6 +149,27 @@ def _extract_input_artifacts(value: str) -> dict[str, list[str]]:
     elif host and not _looks_like_hash(host):
         _safe_append_lower(artifacts["domains"], host)
 
+    # Regex fallback for multi-word inputs (e.g. "explain youtube.com", "check 1.2.3.4 please")
+    # Runs when _extract_src_artifacts is unavailable OR produced no results on free-text input.
+    if not single_token and not (artifacts["urls"] or artifacts["domains"] or artifacts["ipv4"]):
+        # Full URLs
+        for u in re.findall(r'https?://\S+', candidate):
+            _safe_append_lower(artifacts["urls"], u)
+        # Bare domain-like tokens: word.tld or sub.word.tld (letters/digits/hyphens, dot, 2+ letter TLD)
+        for token in re.findall(
+            r'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b',
+            candidate,
+        ):
+            if not _is_ip(token) and not _looks_like_hash(token):
+                _safe_append_lower(artifacts["domains"], token)
+        # Bare IP addresses
+        for token in re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', candidate):
+            try:
+                ipaddress.ip_address(token)
+                _safe_append(artifacts["ipv4"], token)
+            except ValueError:
+                pass
+
     return artifacts
 
 
@@ -397,7 +418,14 @@ def _run_src_enrichment(artifact: str, artifact_kind: str) -> list[Any]:
 
     return _run_async(orchestrator.enrich(artifact, artifact_type_enum(artifact_kind)))
 
-def investigate_threat(url: str = None, file_hash: str = None) -> dict:
+def investigate_threat(url: str = None, file_hash: str = None, progress_callback=None) -> dict:
+    def _cb(n: int, total: int = 7, label: str = "") -> None:
+        if progress_callback:
+            try:
+                progress_callback(n, total, label)
+            except Exception:
+                pass
+
     iocs = _build_ioc_result()
 
     if url and not file_hash and _looks_like_hash(url):
@@ -471,6 +499,7 @@ def investigate_threat(url: str = None, file_hash: str = None) -> dict:
                 return []
 
 
+        _cb(0, 7)
         with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
             future_src = executor.submit(task_src)
             future_resolve = executor.submit(task_resolve_ip)
@@ -487,11 +516,13 @@ def investigate_threat(url: str = None, file_hash: str = None) -> dict:
 
             src_results = future_src.result()
             coverage = _apply_src_results(iocs, src_results, artifact_kind)
+            _cb(1, 7)
 
             if not coverage["virustotal"] and artifact_kind in {"url", "domain"}:
                 vt_payload = vt_url_report(url) if artifact_kind == "url" else {}
                 if vt_payload and "data" in vt_payload:
                     _apply_virustotal_data(iocs, vt_payload, is_hash_lookup=False)
+            _cb(2, 7)
 
             resolved_ip = future_resolve.result()
             if resolved_ip:
@@ -501,6 +532,7 @@ def investigate_threat(url: str = None, file_hash: str = None) -> dict:
             future_abuse = executor.submit(abuseipdb_check, resolved_ip) if not coverage["abuseipdb"] and resolved_ip else None
             future_shodan = executor.submit(shodan_host, resolved_ip) if resolved_ip else None
             future_geo = executor.submit(ip_geolocation, resolved_ip) if not iocs["geo"] and resolved_ip else None
+            _cb(3, 7)
 
             # --- Safe Browsing ---
             sb = future_sb.result()
@@ -524,6 +556,7 @@ def investigate_threat(url: str = None, file_hash: str = None) -> dict:
                     if d not in iocs["domains"]: iocs["domains"].append(d)
                 cert = lists.get("certificates", [])
                 if cert: iocs["details"]["certificates"] = cert[0]
+            _cb(4, 7)
 
             # --- WHOIS ---
             w = future_whois.result() if future_whois else {}
@@ -543,6 +576,7 @@ def investigate_threat(url: str = None, file_hash: str = None) -> dict:
             # --- IP Geo ---
             geo = future_geo.result() if future_geo else {}
             if geo: iocs["geo"] = geo
+            _cb(5, 7)
 
             # --- DNS ---
             iocs["dns_records"] = future_dns.result()
@@ -574,24 +608,30 @@ def investigate_threat(url: str = None, file_hash: str = None) -> dict:
                 if subs: iocs["subdomains"] = subs[:20]
             except:
                 pass
+            _cb(6, 7)
 
             # --- Heuristics & Redirects ---
             iocs["dom_heuristics"] = future_dom.result()
             iocs["redirect_chain"] = future_redirs.result()
+            _cb(7, 7)
 
 
     elif file_hash:
         file_hash = file_hash.strip()
         _safe_append(iocs["hashes"], file_hash)
+        _cb(0, 7)
 
         coverage = _apply_src_results(iocs, _run_src_enrichment(file_hash, "hash"), "hash")
+        _cb(3, 7)
         if not coverage["virustotal"]:
             vt = vt_hash_lookup(file_hash)
             if vt and "data" in vt:
                 _apply_virustotal_data(iocs, vt, is_hash_lookup=True)
+        _cb(6, 7)
 
         if iocs["vt_stats"]:
             iocs["risk_score"] = max(iocs["risk_score"], iocs["vt_stats"].get("malicious", 0) * 3)
+        _cb(7, 7)
 
     # Clamp risk
     iocs["risk_score"] = round(min(10.0, iocs["risk_score"]), 1)
@@ -1073,7 +1113,7 @@ def generate_threat_actor_profile(domain: str, iocs: dict) -> dict:
         }
 
 
-def investigate_threat_cached(url: str = None, file_hash: str = None) -> dict:
+def investigate_threat_cached(url: str = None, file_hash: str = None, progress_callback=None) -> dict:
     """investigate_threat with persistent SQLite disk cache (survives restarts)."""
     from utils.disk_cache import cache_get, cache_set
     cache_key = url or file_hash or ""
@@ -1085,7 +1125,7 @@ def investigate_threat_cached(url: str = None, file_hash: str = None) -> dict:
         cached["_from_cache"] = True
         return cached
 
-    result = investigate_threat(url=url, file_hash=file_hash)
+    result = investigate_threat(url=url, file_hash=file_hash, progress_callback=progress_callback)
     result["_from_cache"] = False
     cache_set(namespace, result, TTL, cache_key)
     return result

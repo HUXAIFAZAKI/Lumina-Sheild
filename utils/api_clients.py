@@ -1,4 +1,4 @@
-import requests
+﻿import requests
 import os
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -18,7 +18,7 @@ def _vt_url_id(url: str) -> str:
     """VT v3 URL identifier = base64(url) without trailing '='."""
     return base64.urlsafe_b64encode(url.encode()).decode().rstrip("=")
 
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def vt_url_scan(url: str) -> dict:
     """Submit URL for scanning, poll until done, return analysis result."""
     if not VT_API_KEY: return {"error": "API key missing"}
@@ -45,9 +45,9 @@ def vt_url_scan(url: str) -> dict:
     # Return whatever we got
     return analysis_resp.json() if analysis_resp.status_code == 200 else {"error": "Poll timeout"}
 
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def vt_url_report(url: str) -> dict:
-    """Fetch the FULL URL report — per-vendor verdicts, categories, reputation, HTTP info.
+    """Fetch the FULL URL report â€” per-vendor verdicts, categories, reputation, HTTP info.
     This is equivalent to what you see on the VirusTotal website."""
     if not VT_API_KEY: return {"error": "API key missing"}
     headers={"x-apikey": VT_API_KEY, "User-Agent": "LuminaShield/1.0 (Hackathon Project)"}
@@ -60,7 +60,7 @@ def vt_url_report(url: str) -> dict:
         return resp.json()
     return {"error": f"Report HTTP {resp.status_code}"}
 
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def vt_hash_lookup(file_hash: str) -> dict:
     if not VT_API_KEY: return {"error": "API key missing"}
     headers={"x-apikey": VT_API_KEY, "User-Agent": "LuminaShield/1.0 (Hackathon Project)"}
@@ -68,7 +68,7 @@ def vt_hash_lookup(file_hash: str) -> dict:
     return resp.json() if resp.status_code == 200 else {}
 
 # ---- URLScan.io ----
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def urlscan_submit(url: str) -> dict:
     if not URLSCAN_API_KEY:
         return {"error": "API key missing"}
@@ -114,7 +114,7 @@ def urlscan_submit(url: str) -> dict:
         return {"error": f"URLScan submit failed: {exc}"}
 
 # ---- AbuseIPDB ----
-@st.cache_data(ttl=3600*2)
+@st.cache_data(ttl=3600*2, show_spinner=False)
 def abuseipdb_check(ip: str) -> dict:
     if not ABUSEIPDB_KEY: return {}
     headers={"Key": ABUSEIPDB_KEY, "Accept": "application/json", "User-Agent": "LuminaShield/1.0 (Hackathon Project)"}
@@ -123,7 +123,7 @@ def abuseipdb_check(ip: str) -> dict:
     return resp.json() if resp.status_code == 200 else {}
 
 # ---- PhishTank (no key needed) ----
-@st.cache_data(ttl=3600*12)
+@st.cache_data(ttl=3600*12, show_spinner=False)
 def phishtank_check(url: str) -> bool:
     try:
         resp = requests.post("https://checkurl.phishtank.com/checkurl/", data={"url": url, "format": "json"}, headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"})
@@ -134,7 +134,7 @@ def phishtank_check(url: str) -> bool:
 
 # ---- WHOIS ----
 import whois
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def whois_lookup(domain: str) -> dict:
     try:
         w = whois.whois(domain)
@@ -150,7 +150,7 @@ def whois_lookup(domain: str) -> dict:
 # ---- DNS Resolution via dnspython (FREE, no API key) ----
 import dns.resolver
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def dns_resolve_all(domain: str) -> dict:
     """Resolve A, AAAA, MX, NS, TXT, CNAME records using dnspython. Completely free."""
     records = {
@@ -168,7 +168,7 @@ def dns_resolve_all(domain: str) -> dict:
             pass
     return records
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def dns_reverse_lookup(ip: str) -> str:
     """Reverse DNS lookup for an IP."""
     try:
@@ -180,7 +180,7 @@ def dns_reverse_lookup(ip: str) -> str:
         return ""
 
 # ---- Google Public DNS over HTTPS (FREE, no API key) ----
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def google_dns_resolve(domain: str, rtype: str = "A") -> list:
     """Use Google Public DNS-over-HTTPS for DNS resolution. Completely free."""
     try:
@@ -196,7 +196,7 @@ def google_dns_resolve(domain: str, rtype: str = "A") -> list:
     return []
 
 # ---- crt.sh Subdomains (FREE, no API key) ----
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def crt_sh_subdomains(domain: str) -> list:
     """Fetch subdomains using crt.sh (completely free, no API key)."""
     try:
@@ -218,7 +218,7 @@ def crt_sh_subdomains(domain: str) -> list:
     return []
 
 # ---- URLHaus by abuse.ch (FREE, no API key) ----
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def urlhaus_check(domain: str) -> dict:
     """Check domain against URLhaus (completely free, no API key)."""
     try:
@@ -230,7 +230,7 @@ def urlhaus_check(domain: str) -> dict:
     return {}
 
 # ---- ThreatFox by abuse.ch (FREE, no API key) ----
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def threatfox_search(search_term: str, search_type: str = "ioc") -> dict:
     """Search ThreatFox for IOCs. search_type: 'ioc', 'tag', 'malware', 'hash'."""
     try:
@@ -242,7 +242,7 @@ def threatfox_search(search_term: str, search_type: str = "ioc") -> dict:
         pass
     return {}
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def threatfox_domain_check(domain: str) -> list:
     """Check if a domain appears in ThreatFox IOC database."""
     result = threatfox_search(domain)
@@ -251,7 +251,7 @@ def threatfox_domain_check(domain: str) -> list:
     return []
 
 # ---- IP Geolocation via ip-api.com (FREE, no API key, 45 req/min) ----
-@st.cache_data(ttl=3600*6)
+@st.cache_data(ttl=3600*6, show_spinner=False)
 def ip_geolocation(ip: str) -> dict:
     """Get IP geolocation, ISP, ASN info. Free, no key needed."""
     try:
@@ -268,7 +268,7 @@ def ip_geolocation(ip: str) -> dict:
     return {}
 
 # ---- Google Safe Browsing ----
-@st.cache_data(ttl=3600*2)
+@st.cache_data(ttl=3600*2, show_spinner=False)
 def safe_browsing_check(url: str) -> dict:
     if not SAFE_BROWSING_KEY: return {}
     api_url = f"https://safebrowsing.googleapis.com/v4/threatMatches:find?key={SAFE_BROWSING_KEY}"
@@ -285,7 +285,7 @@ def safe_browsing_check(url: str) -> dict:
     return resp.json() if resp.status_code == 200 else {}
 
 # ---- Shodan ----
-@st.cache_data(ttl=3600*12)
+@st.cache_data(ttl=3600*12, show_spinner=False)
 def shodan_host(ip: str) -> dict:
     if not SHODAN_KEY: return {}
     try:
@@ -295,7 +295,7 @@ def shodan_host(ip: str) -> dict:
         return {}
 
 # ---- Technology Stack Detection (from HTTP headers) ----
-@st.cache_data(ttl=3600*12)
+@st.cache_data(ttl=3600*12, show_spinner=False)
 def detect_tech_stack(url: str) -> dict:
     """Detect technologies from HTTP response headers. No API key needed."""
     tech = {
@@ -347,7 +347,7 @@ def detect_tech_stack(url: str) -> dict:
     return tech
 
 # ---- Shodan InternetDB (FREE, no API key) ----
-@st.cache_data(ttl=3600*12)
+@st.cache_data(ttl=3600*12, show_spinner=False)
 def shodan_internetdb(ip: str) -> dict:
     """Get open ports, CVEs, CPEs, hostnames from Shodan InternetDB. FREE, no key."""
     try:
@@ -360,7 +360,7 @@ def shodan_internetdb(ip: str) -> dict:
     return {}
 
 # ---- CIRCL Passive DNS (FREE, no API key) ----
-@st.cache_data(ttl=3600*6)
+@st.cache_data(ttl=3600*6, show_spinner=False)
 def circl_pdns(query: str) -> list:
     """Get passive DNS history from CIRCL PDNS. FREE, no key. Returns list of {rrtype, rdata, time_first, time_last}."""
     try:
@@ -385,7 +385,7 @@ def circl_pdns(query: str) -> list:
     return []
 
 # ---- BGPView IP/ASN Intelligence (FREE, no API key) ----
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def bgpview_ip_info(ip: str) -> dict:
     """Get ASN, prefix, country, RIR info for an IP. FREE, no key."""
     try:
@@ -397,9 +397,9 @@ def bgpview_ip_info(ip: str) -> dict:
         pass
     return {}
 
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def bgpview_asn_info(asn: int) -> dict:
-    """Get ASN details — name, description, peers, prefixes. FREE, no key."""
+    """Get ASN details â€” name, description, peers, prefixes. FREE, no key."""
     try:
         resp = requests.get(f"https://api.bgpview.io/asn/{asn}", timeout=10,
                             headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"})
@@ -410,7 +410,7 @@ def bgpview_asn_info(asn: int) -> dict:
     return {}
 
 # ---- HackerTarget Reverse IP Lookup (FREE, limited to 20 req/day) ----
-@st.cache_data(ttl=3600*12)
+@st.cache_data(ttl=3600*12, show_spinner=False)
 def hackertarget_reverse_ip(ip: str) -> list:
     """Find all domains hosted on same IP. FREE, limited."""
     try:
@@ -423,7 +423,7 @@ def hackertarget_reverse_ip(ip: str) -> list:
     return []
 
 # ---- MXToolbox-style Email Security Check (via DNS, FREE) ----
-@st.cache_data(ttl=3600*6)
+@st.cache_data(ttl=3600*6, show_spinner=False)
 def email_security_check(domain: str) -> dict:
     """Check SPF, DKIM, DMARC presence via DNS TXT records. FREE."""
     result = {"spf": None, "dmarc": None, "dkim_hint": None}
@@ -448,7 +448,7 @@ def email_security_check(domain: str) -> dict:
     return result
 
 # ---- AlienVault OTX Pulse search (FREE, no key for basic lookups) ----
-@st.cache_data(ttl=3600*6)
+@st.cache_data(ttl=3600*6, show_spinner=False)
 def otx_domain_report(domain: str) -> dict:
     """Get OTX pulse/indicator report for a domain. FREE (no key for basic)."""
     try:
@@ -463,7 +463,7 @@ def otx_domain_report(domain: str) -> dict:
         pass
     return {}
 
-@st.cache_data(ttl=3600*6)
+@st.cache_data(ttl=3600*6, show_spinner=False)
 def otx_ip_report(ip: str) -> dict:
     """Get OTX pulse/indicator report for an IP. FREE (no key for basic)."""
     try:
@@ -479,14 +479,14 @@ def otx_ip_report(ip: str) -> dict:
     return {}
 
 # ---- URLScan.io Screenshot (uses existing API key if present) ----
-@st.cache_data(ttl=3600*24)
+@st.cache_data(ttl=3600*24, show_spinner=False)
 def urlscan_latest_screenshot(domain: str) -> dict:
     """
-    1. Search URLScan.io for an existing scan (no auth — search is public).
+    1. Search URLScan.io for an existing scan (no auth â€” search is public).
     2. Download the screenshot PNG bytes directly.
     3. If no URLScan history, fall back to thum.io (free, no API key, live render).
     """
-    # Search without API key — adding an invalid key returns 403
+    # Search without API key â€” adding an invalid key returns 403
     search_headers = {"User-Agent": "Mozilla/5.0 (compatible; LuminaShield/1.0)"}
 
     try:
