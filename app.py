@@ -2088,7 +2088,7 @@ def _render_cyber_basic_mode():
                     return colors.get(val, "")
 
                 styled = vdf.style.map(color_category, subset=["Category"])
-                st.dataframe(styled, use_container_width=True, height=400)
+                st.dataframe(styled, width='stretch', height=400)
 
         # ===== CATEGORIES & REPUTATION =====
         col1, col2 = st.columns(2)
@@ -2155,7 +2155,7 @@ def _render_cyber_basic_mode():
             df_rows.append({"Type": "Email", "Value": e, "Abuse Score": "N/A"})
 
         if df_rows:
-            st.dataframe(pd.DataFrame(df_rows), use_container_width=True)
+            st.dataframe(pd.DataFrame(df_rows), width='stretch')
         else:
             st.info("No IOCs extracted.")
 
@@ -2345,7 +2345,7 @@ def _render_cyber_deep_mode():
                         "Last Seen": last,
                         "Count": rec.get("count", 1),
                     })
-                st.dataframe(pd.DataFrame(pdns_rows), use_container_width=True, height=300)
+                st.dataframe(pd.DataFrame(pdns_rows), width='stretch', height=300)
                 st.caption("Historical DNS resolution records showing every IP this domain has ever pointed to.")
             else:
                 st.info("No passive DNS history found for this domain.")
@@ -2356,7 +2356,7 @@ def _render_cyber_deep_mode():
                 subs = crt_sh_subdomains(r_domain)
             if subs:
                 st.success(f"Found **{len(subs)}** subdomains from public certificate records!")
-                st.dataframe(pd.DataFrame(subs, columns=["Subdomain"]), use_container_width=True, height=300)
+                st.dataframe(pd.DataFrame(subs, columns=["Subdomain"]), width='stretch', height=300)
             else:
                 st.info("No subdomains found in public certificate records.")
 
@@ -2449,7 +2449,7 @@ def _render_cyber_deep_mode():
                             st.info(f"Found **{len(siblings)}** other domains sharing this server")
                             st.dataframe(
                                 pd.DataFrame(siblings, columns=["Domain"]),
-                                use_container_width=True, height=200,
+                                width='stretch', height=200,
                             )
                         else:
                                 st.write("No other domains found on this server.")
@@ -2746,57 +2746,79 @@ def _render_cyber_deep_mode():
                         st.markdown(f"""
                         <div style='background:linear-gradient(135deg,#b71c1c11,#e5390006);
                                     border:1.5px solid #b71c1c33;border-left:5px solid #b71c1c;
-                                    border-radius:16px;padding:1.1rem 1.4rem;margin:0.5rem 0 1rem;'>
-                            <div style='font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                                    border-radius:12px;padding:1rem 1.2rem;margin:0.5rem 0 1rem;
+                                    max-width:100%;box-sizing:border-box;'>
+                            <div style='font-size:0.7rem;font-weight:700;text-transform:uppercase;
                                         letter-spacing:1px;color:#b71c1c;margin-bottom:6px;'>
-                                ⛓️ ATTACK TIMELINE
+                                ATTACK TIMELINE
                             </div>
-                            <div style='font-size:0.92rem;color:#1a1714;line-height:1.6;'>{_kc_data['narrative']}</div>
-                            <div style='margin-top:8px;font-size:0.8rem;color:#7a7268;'>
-                                Estimated duration: <strong style='color:#b71c1c;'>{_kc_data.get('attack_duration_estimate','?')}</strong>
+                            <div style='font-size:0.88rem;color:#1a1714;line-height:1.6;
+                                        word-break:break-word;'>{_kc_data['narrative']}</div>
+                            <div style='margin-top:8px;font-size:0.78rem;color:#7a7268;'>
+                                Estimated duration:&nbsp;
+                                <strong style='color:#b71c1c;'>{_kc_data.get('attack_duration_estimate','?')}</strong>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # Phase cards — vertical timeline
+                    # Phase cards — all rendered in one block to preserve the timeline layout
                     phases = _kc_data.get("phases", [])
                     conf_colors = {"High": "#b71c1c", "Medium": "#e65100", "Low": "#4CAF50"}
+
+                    _timeline_html = "<div style='max-width:100%;box-sizing:border-box;'>"
                     for _idx, _ph in enumerate(phases):
                         _ph_conf  = _ph.get("confidence", "Low")
                         _ph_color = conf_colors.get(_ph_conf, "#9E9E9E")
-                        _ioc_tags = " ".join(
-                            f"<code style='background:#fff8ec;color:#c88b00;padding:1px 7px;border-radius:8px;"
-                            f"font-size:0.75rem;border:1px solid rgba(229,161,0,0.2);'>{ir}</code>"
+                        _ph_name  = _ph.get("phase", "?")
+                        _ph_ev    = _ph.get("evidence", "")
+                        _ioc_tags = "".join(
+                            f"<span style='display:inline-block;background:#fff8ec;color:#c88b00;"
+                            f"padding:2px 8px;border-radius:8px;font-size:0.72rem;"
+                            f"border:1px solid rgba(229,161,0,0.25);margin:2px 2px 0 0;"
+                            f"word-break:break-all;'>{ir}</span>"
                             for ir in _ph.get("ioc_refs", [])[:4]
                         )
+                        _is_last = _idx == len(phases) - 1
                         _connector = (
-                            "<div style='width:2px;height:20px;background:#dee2e6;margin:0 0 0 19px;'></div>"
-                            if _idx < len(phases) - 1 else ""
+                            "" if _is_last
+                            else "<div style='width:2px;height:18px;background:#e0d8ce;"
+                                 "margin:2px auto 2px;'></div>"
                         )
-                        st.markdown(f"""
-                        <div style='display:flex;gap:14px;align-items:flex-start;'>
-                            <div style='display:flex;flex-direction:column;align-items:center;min-width:40px;'>
-                                <div style='width:40px;height:40px;border-radius:50%;
-                                            background:{_ph_color}22;border:2px solid {_ph_color};
+                        _timeline_html += f"""
+                        <div style='display:flex;gap:12px;align-items:flex-start;
+                                    max-width:100%;box-sizing:border-box;'>
+                            <div style='display:flex;flex-direction:column;align-items:center;
+                                        flex-shrink:0;width:36px;'>
+                                <div style='width:36px;height:36px;border-radius:50%;
+                                            background:{_ph_color}18;border:2px solid {_ph_color};
                                             display:flex;align-items:center;justify-content:center;
-                                            font-size:1.2rem;flex-shrink:0;'>{_ph.get('icon','⚙️')}</div>
+                                            font-size:0.8rem;font-weight:700;color:{_ph_color};
+                                            flex-shrink:0;'>{_idx+1}</div>
                                 {_connector}
                             </div>
-                            <div style='flex:1;background:#fffdf5;border:1px solid rgba(229,161,0,0.12);
-                                        border-left:3px solid {_ph_color};border-radius:12px;
-                                        padding:0.9rem 1.1rem;margin-bottom:4px;'>
-                                <div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'>
-                                    <strong style='font-size:0.95rem;color:#1a1714;'>{_ph.get('phase','?')}</strong>
-                                    <span style='font-size:0.72rem;font-weight:700;color:{_ph_color};
-                                                 background:{_ph_color}18;padding:2px 10px;border-radius:20px;'>
+                            <div style='flex:1;min-width:0;background:#fffdf5;
+                                        border:1px solid rgba(229,161,0,0.12);
+                                        border-left:3px solid {_ph_color};border-radius:10px;
+                                        padding:0.75rem 1rem;margin-bottom:4px;
+                                        box-sizing:border-box;overflow:hidden;'>
+                                <div style='display:flex;align-items:center;
+                                            justify-content:space-between;
+                                            flex-wrap:wrap;gap:6px;margin-bottom:6px;'>
+                                    <strong style='font-size:0.9rem;color:#1a1714;'>{_ph_name}</strong>
+                                    <span style='font-size:0.7rem;font-weight:700;color:{_ph_color};
+                                                 background:{_ph_color}18;padding:2px 10px;
+                                                 border-radius:20px;white-space:nowrap;'>
                                         {_ph_conf}
                                     </span>
                                 </div>
-                                <p style='margin:0 0 8px;font-size:0.87rem;color:#4a4540;line-height:1.55;'>{_ph.get('evidence','')}</p>
-                                <div style='display:flex;flex-wrap:wrap;gap:4px;'>{_ioc_tags}</div>
+                                <p style='margin:0 0 6px;font-size:0.84rem;color:#4a4540;
+                                          line-height:1.5;word-break:break-word;'>{_ph_ev}</p>
+                                <div style='display:flex;flex-wrap:wrap;'>{_ioc_tags}</div>
                             </div>
                         </div>
-                        """, unsafe_allow_html=True)
+                        """
+                    _timeline_html += "</div>"
+                    st.markdown(_timeline_html, unsafe_allow_html=True)
                 else:
                     st.info("Click **Reconstruct Kill Chain** above to map IOC evidence to the attack lifecycle.")
 
@@ -2875,21 +2897,96 @@ def _render_cyber_deep_mode():
             # ── Deep Intelligence PDF ───────────────────────────────────────
             st.markdown("---")
             st.subheader("📑 Deep Intelligence PDF Report")
+            st.caption(
+                "Generates a complete report — any sections not yet analysed will be "
+                "fetched automatically before building the PDF."
+            )
             if st.button("📑 Generate Deep PDF Report", key="deep_pdf_btn"):
-                with st.spinner("Building comprehensive deep intelligence report…"):
-                    _deep_iocs = st.session_state.get("cyber_result") or {}
-                    _ai_cache  = st.session_state.get(f"cyber_ai_{r_domain}") or {}
-                    _deep_pdf_path = generate_deep_pdf(
-                        target=r_domain,
-                        iocs=_deep_iocs,
-                        summary_text=_ai_cache.get("summary"),
-                        narrative_data=_ai_cache.get("narrative"),
-                        actor_profile=st.session_state.get(f"actor_{r_domain}"),
-                        kill_chain_data=st.session_state.get(f"kill_chain_{r_domain}"),
-                        yara_rule=st.session_state.get("r_yara_rule"),
-                        snort_rule=st.session_state.get("r_snort_rule"),
-                        annotations=get_annotations(r_domain),
+                from agents.threat_investigator import (
+                    generate_threat_summary, generate_narrative_intelligence,
+                    generate_threat_actor_profile, generate_kill_chain_timeline,
+                    generate_yara_rule, generate_snort_rule, investigate_threat_cached,
+                )
+
+                _pdf_steps = st.progress(0, text="Gathering IOC data…")
+
+                # ── Step 1: IOC data ──────────────────────────────────────
+                _deep_iocs = st.session_state.get("cyber_result") or {}
+                if not _deep_iocs:
+                    _deep_iocs = (
+                        get_mock_threat_result(r_target)
+                        if st.session_state.get("demo_mode")
+                        else investigate_threat_cached(url=r_target)
                     )
+                    st.session_state.cyber_result = _deep_iocs
+                _pdf_steps.progress(15, text="Generating AI summary & narrative…")
+
+                # ── Step 2: AI summary + narrative ────────────────────────
+                _ai_cache_key = f"cyber_ai_{r_domain}"
+                _ai_cache = st.session_state.get(_ai_cache_key) or {}
+                if not _ai_cache:
+                    _narrative_result = generate_narrative_intelligence(r_domain, _deep_iocs)
+                    _summary_result   = generate_threat_summary(r_domain, _deep_iocs, narrative_hint=_narrative_result)
+                    _ai_cache = {"summary": _summary_result, "narrative": _narrative_result}
+                    st.session_state[_ai_cache_key] = _ai_cache
+                _pdf_steps.progress(35, text="Building threat actor profile…")
+
+                # ── Step 3: Threat actor profile ──────────────────────────
+                _actor_key = f"actor_{r_domain}"
+                _actor_profile = st.session_state.get(_actor_key)
+                if not _actor_profile:
+                    try:
+                        _actor_profile = generate_threat_actor_profile(r_domain, _deep_iocs)
+                        st.session_state[_actor_key] = _actor_profile
+                    except Exception:
+                        _actor_profile = None
+                _pdf_steps.progress(55, text="Reconstructing kill-chain timeline…")
+
+                # ── Step 4: Kill-chain timeline ───────────────────────────
+                _kc_key = f"kill_chain_{r_domain}"
+                _kc_data = st.session_state.get(_kc_key)
+                if not _kc_data:
+                    try:
+                        _kc_data = generate_kill_chain_timeline(r_domain, _deep_iocs, _actor_profile or {})
+                        st.session_state[_kc_key] = _kc_data
+                    except Exception:
+                        _kc_data = None
+                _pdf_steps.progress(70, text="Forging YARA rule…")
+
+                # ── Step 5: YARA rule ─────────────────────────────────────
+                _yara = st.session_state.get("r_yara_rule")
+                if not _yara:
+                    try:
+                        _yara = generate_yara_rule(_deep_iocs)
+                        st.session_state.r_yara_rule = _yara
+                    except Exception:
+                        _yara = None
+                _pdf_steps.progress(82, text="Forging Snort/Suricata rules…")
+
+                # ── Step 6: Snort rule ────────────────────────────────────
+                _snort = st.session_state.get("r_snort_rule")
+                if not _snort:
+                    try:
+                        _snort = generate_snort_rule(_deep_iocs)
+                        st.session_state.r_snort_rule = _snort
+                    except Exception:
+                        _snort = None
+                _pdf_steps.progress(92, text="Rendering PDF…")
+
+                # ── Step 7: Build PDF ─────────────────────────────────────
+                _deep_pdf_path = generate_deep_pdf(
+                    target=r_domain,
+                    iocs=_deep_iocs,
+                    summary_text=_ai_cache.get("summary"),
+                    narrative_data=_ai_cache.get("narrative"),
+                    actor_profile=_actor_profile,
+                    kill_chain_data=_kc_data,
+                    yara_rule=_yara,
+                    snort_rule=_snort,
+                    annotations=get_annotations(r_domain),
+                )
+                _pdf_steps.progress(100, text="Done!")
+                _pdf_steps.empty()
                 with open(_deep_pdf_path, "rb") as _deep_f:
                     st.download_button(
                         "⬇️ Download Deep Intelligence Report",

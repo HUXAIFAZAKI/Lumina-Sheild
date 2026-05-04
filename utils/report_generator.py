@@ -2,9 +2,90 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 import os, hashlib, tempfile, io, textwrap, platform
 from datetime import datetime
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Unicode / emoji helpers for PDF rendering
+# ──────────────────────────────────────────────────────────────────────────
+
+def _setup_pdf_unicode_font() -> tuple:
+    """Register a Unicode-capable TTF font for PDF rendering.
+
+    Returns a (regular_name, bold_name) tuple.  Falls back to the
+    built-in ('Helvetica', 'Helvetica-Bold') when no suitable TTF is found.
+    """
+    if platform.system() == "Windows":
+        wf = "C:/Windows/Fonts/"
+        candidates = [
+            (wf + "arial.ttf",   wf + "arialbd.ttf",  "LuminaPDF", "LuminaPDF-Bold"),
+            (wf + "calibri.ttf", wf + "calibrib.ttf", "LuminaPDF", "LuminaPDF-Bold"),
+            (wf + "segoeui.ttf", wf + "segoeuib.ttf", "LuminaPDF", "LuminaPDF-Bold"),
+        ]
+    else:
+        tf = "/usr/share/fonts/truetype/"
+        candidates = [
+            (tf + "dejavu/DejaVuSans.ttf",
+             tf + "dejavu/DejaVuSans-Bold.ttf",
+             "LuminaPDF", "LuminaPDF-Bold"),
+            (tf + "liberation/LiberationSans-Regular.ttf",
+             tf + "liberation/LiberationSans-Bold.ttf",
+             "LuminaPDF", "LuminaPDF-Bold"),
+            (tf + "ubuntu/Ubuntu-R.ttf",
+             tf + "ubuntu/Ubuntu-B.ttf",
+             "LuminaPDF", "LuminaPDF-Bold"),
+        ]
+
+    # Return early if already registered
+    try:
+        registered = pdfmetrics.getRegisteredFontNames()
+        if "LuminaPDF" in registered:
+            bold = "LuminaPDF-Bold" if "LuminaPDF-Bold" in registered else "LuminaPDF"
+            return "LuminaPDF", bold
+    except Exception:
+        pass
+
+    for reg_path, bold_path, reg_name, bold_name in candidates:
+        try:
+            if not os.path.exists(reg_path):
+                continue
+            pdfmetrics.registerFont(TTFont(reg_name, reg_path))
+            if os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont(bold_name, bold_path))
+                return reg_name, bold_name
+            return reg_name, reg_name
+        except Exception:
+            continue
+
+    return "Helvetica", "Helvetica-Bold"
+
+
+def _clean_for_pdf(text: str) -> str:
+    """Strip all characters that are not safely renderable in a PDF.
+
+    Keeps only printable ASCII (U+0020-U+007E) plus common Western Latin
+    characters (U+00A0-U+024F) and a small set of typographic punctuation.
+    Everything else — emoji, symbols, dingbats, arrows, box-drawing chars,
+    CJK, etc. — is removed so the PDF looks clean and professional.
+    """
+    result = []
+    for ch in str(text):
+        cp = ord(ch)
+        # Printable ASCII
+        if 0x0020 <= cp <= 0x007E:
+            result.append(ch)
+        # Non-breaking space, common Latin Extended A/B, Latin Extended Additional
+        elif 0x00A0 <= cp <= 0x024F:
+            result.append(ch)
+        # Typographic quotes, dashes, ellipsis (U+2013, U+2014, U+2018-U+201D, U+2026)
+        elif cp in (0x2013, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2026):
+            result.append(ch)
+        # Bullet point (U+2022) and middle dot (U+00B7) — already in Latin range above
+        # Skip everything else (emoji, symbols, CJK, arrows, dingbats, etc.)
+    return ''.join(result)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -244,6 +325,9 @@ def generate_verdict_card_png(
     return buf.getvalue()
 
 def generate_pdf(url: str, iocs: dict, summary_text: str = None, narrative_data: dict = None) -> str:
+    # Register a Unicode font once so emoji-adjacent characters render correctly
+    _body_font, _bold_font = _setup_pdf_unicode_font()
+
     # Use OS-appropriate temp directory
     tmp_dir = tempfile.gettempdir()
     filename = f"lumina_report_{hashlib.md5(url.encode()).hexdigest()}.pdf"
@@ -258,38 +342,38 @@ def generate_pdf(url: str, iocs: dict, summary_text: str = None, narrative_data:
     title_style = ParagraphStyle(
         'LuminaTitle', parent=styles['Title'],
         fontSize=22, textColor=colors.HexColor("#c88b00"),
-        spaceAfter=4, leading=28,
+        spaceAfter=4, leading=28, fontName=_bold_font,
     )
     subtitle_style = ParagraphStyle(
         'LuminaSubtitle', parent=styles['Normal'],
         fontSize=9, textColor=colors.HexColor("#7a7268"),
-        spaceAfter=2,
+        spaceAfter=2, fontName=_body_font,
     )
     heading_style = ParagraphStyle(
         'LuminaH2', parent=styles['Heading2'],
         fontSize=13, textColor=colors.HexColor("#1a1714"),
         spaceBefore=18, spaceAfter=6,
-        borderPad=4,
+        borderPad=4, fontName=_bold_font,
     )
     subheading_style = ParagraphStyle(
         'LuminaH3', parent=styles['Heading3'],
         fontSize=11, textColor=colors.HexColor("#c88b00"),
-        spaceBefore=10, spaceAfter=4,
+        spaceBefore=10, spaceAfter=4, fontName=_bold_font,
     )
     normal_style = ParagraphStyle(
         'LuminaNormal', parent=styles['Normal'],
         fontSize=9, textColor=colors.HexColor("#1a1714"),
-        leading=14,
+        leading=14, fontName=_body_font,
     )
     caption_style = ParagraphStyle(
         'LuminaCaption', parent=styles['Normal'],
         fontSize=8, textColor=colors.HexColor("#7a7268"),
-        leading=12,
+        leading=12, fontName=_body_font,
     )
     footer_style = ParagraphStyle(
         'LuminaFooter', parent=styles['Normal'],
         fontSize=8, textColor=colors.HexColor("#a09585"),
-        leading=11,
+        leading=11, fontName=_body_font,
     )
     code_style = ParagraphStyle(
         'LuminaCode', parent=styles['Normal'],
@@ -300,15 +384,17 @@ def generate_pdf(url: str, iocs: dict, summary_text: str = None, narrative_data:
     cell_style = ParagraphStyle(
         'LuminaCell', parent=styles['Normal'],
         fontSize=8, textColor=colors.HexColor("#1a1714"),
-        leading=11,
+        leading=11, fontName=_body_font,
     )
 
     import re as _re
 
     def _md_to_rl(text: str) -> str:
         """Convert markdown text to ReportLab XML-safe string with bold and bullets."""
+        # Remove emoji and supplementary-plane characters that PDF fonts cannot render
+        text = _clean_for_pdf(str(text))
         # Strip any existing HTML/XML tags
-        text = _re.sub(r'<[^>]+>', '', str(text)).strip()
+        text = _re.sub(r'<[^>]+>', '', text).strip()
         # Escape XML special characters first
         text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         # Split on **bold** markers; insert <br/> before each bold section (except the first)
@@ -426,7 +512,7 @@ def generate_pdf(url: str, iocs: dict, summary_text: str = None, narrative_data:
             sc_data = [["Scenario", "Probability", "Description"]]
             for sc in scenarios:
                 sc_data.append([
-                    _cp(f"{sc.get('icon', '')} {sc.get('name', '')}"),
+                    _cp(sc.get('name', '')),
                     _cp(f"{sc.get('probability', 0)}%"),
                     _cp(sc.get("description", "")),
                 ])
@@ -535,8 +621,7 @@ def generate_pdf(url: str, iocs: dict, summary_text: str = None, narrative_data:
         story.append(Paragraph("Redirect Chain", heading_style))
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
         for idx, link in enumerate(redirect_chain):
-            prefix = "   → " if idx > 0 else "[1] "
-            prefix = f"[{idx+1}] " if idx == 0 else f"  ↓  [{idx+1}] "
+            prefix = f"[{idx+1}] " if idx == 0 else f"  -> [{idx+1}] "
             story.append(Paragraph(f"{prefix}{link}", code_style))
         story.append(Spacer(1, 10))
 
@@ -701,6 +786,9 @@ def generate_deep_pdf(
 ) -> str:
     """Generate a comprehensive deep-mode forensic PDF report."""
     iocs = iocs or {}
+    # Register a Unicode font so emoji-adjacent characters render correctly
+    _body_font, _bold_font = _setup_pdf_unicode_font()
+
     tmp_dir = tempfile.gettempdir()
     filename = f"lumina_deep_{hashlib.md5(target.encode()).hexdigest()}.pdf"
     path = os.path.join(tmp_dir, filename)
@@ -712,31 +800,42 @@ def generate_deep_pdf(
 
     # ── Shared styles (same palette as generate_pdf) ───────────────────────
     title_style = ParagraphStyle('DTitle', parent=styles['Title'],
-        fontSize=22, textColor=colors.HexColor("#c88b00"), spaceAfter=4, leading=28)
+        fontSize=22, textColor=colors.HexColor("#c88b00"), spaceAfter=4, leading=28,
+        fontName=_bold_font)
     subtitle_style = ParagraphStyle('DSubtitle', parent=styles['Normal'],
-        fontSize=9, textColor=colors.HexColor("#7a7268"), spaceAfter=2)
+        fontSize=9, textColor=colors.HexColor("#7a7268"), spaceAfter=2,
+        fontName=_body_font)
     heading_style = ParagraphStyle('DH2', parent=styles['Heading2'],
-        fontSize=13, textColor=colors.HexColor("#1a1714"), spaceBefore=18, spaceAfter=6)
+        fontSize=13, textColor=colors.HexColor("#1a1714"), spaceBefore=18, spaceAfter=6,
+        fontName=_bold_font)
     subheading_style = ParagraphStyle('DH3', parent=styles['Heading3'],
-        fontSize=11, textColor=colors.HexColor("#c88b00"), spaceBefore=10, spaceAfter=4)
+        fontSize=11, textColor=colors.HexColor("#c88b00"), spaceBefore=10, spaceAfter=4,
+        fontName=_bold_font)
     deep_heading_style = ParagraphStyle('DH2Deep', parent=styles['Heading2'],
-        fontSize=13, textColor=colors.HexColor("#b71c1c"), spaceBefore=18, spaceAfter=6)
+        fontSize=13, textColor=colors.HexColor("#b71c1c"), spaceBefore=18, spaceAfter=6,
+        fontName=_bold_font)
     normal_style = ParagraphStyle('DNormal', parent=styles['Normal'],
-        fontSize=9, textColor=colors.HexColor("#1a1714"), leading=14)
+        fontSize=9, textColor=colors.HexColor("#1a1714"), leading=14,
+        fontName=_body_font)
     caption_style = ParagraphStyle('DCaption', parent=styles['Normal'],
-        fontSize=8, textColor=colors.HexColor("#7a7268"), leading=12)
+        fontSize=8, textColor=colors.HexColor("#7a7268"), leading=12,
+        fontName=_body_font)
     code_style = ParagraphStyle('DCode', parent=styles['Normal'],
         fontSize=8, textColor=colors.HexColor("#1a1714"),
         fontName='Courier', leading=12, leftIndent=10)
     cell_style = ParagraphStyle('DCell', parent=styles['Normal'],
-        fontSize=8, textColor=colors.HexColor("#1a1714"), leading=11)
+        fontSize=8, textColor=colors.HexColor("#1a1714"), leading=11,
+        fontName=_body_font)
     footer_style = ParagraphStyle('DFooter', parent=styles['Normal'],
-        fontSize=8, textColor=colors.HexColor("#a09585"), leading=11)
+        fontSize=8, textColor=colors.HexColor("#a09585"), leading=11,
+        fontName=_body_font)
 
     import re as _re
 
     def _md_to_rl(text: str) -> str:
-        text = _re.sub(r'<[^>]+>', '', str(text)).strip()
+        # Remove emoji and supplementary-plane characters that PDF fonts cannot render
+        text = _clean_for_pdf(str(text))
+        text = _re.sub(r'<[^>]+>', '', text).strip()
         text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         parts = _re.split(r'\*\*(.+?)\*\*', text)
         result = parts[0]
@@ -838,7 +937,7 @@ def generate_deep_pdf(
             story.append(Paragraph("Attack Scenario Probabilities", subheading_style))
             sc_data = [["Scenario", "Probability", "Description"]]
             for sc in scenarios:
-                sc_data.append([_cp(f"{sc.get('icon','')} {sc.get('name','')}"),
+                sc_data.append([_cp(sc.get('name', '')),
                                  _cp(f"{sc.get('probability', 0)}%"),
                                  _cp(sc.get("description", ""))])
             sc_t = Table(sc_data, colWidths=[160, 60, 290])
@@ -1002,7 +1101,7 @@ def generate_deep_pdf(
         story.append(Paragraph("Redirect Chain", heading_style))
         story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
         for idx, link in enumerate(redirect_chain):
-            prefix = f"[{idx+1}] " if idx == 0 else f"  ↓  [{idx+1}] "
+            prefix = f"[{idx+1}] " if idx == 0 else f"  -> [{idx+1}] "
             story.append(Paragraph(f"{prefix}{link}", code_style))
         story.append(Spacer(1, 10))
 
@@ -1063,7 +1162,7 @@ def generate_deep_pdf(
     # ══════════════════════════════════════════════════════════════════════
     story.append(Spacer(1, 10))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#b71c1c"), spaceAfter=4))
-    story.append(Paragraph("▌ Deep Intelligence Analysis", deep_heading_style))
+    story.append(Paragraph("Deep Intelligence Analysis", deep_heading_style))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#b71c1c"), spaceAfter=10))
 
     # ===== THREAT ACTOR PROFILE =====
@@ -1145,7 +1244,7 @@ def generate_deep_pdf(
             phase_data = [["Phase", "Confidence", "Evidence"]]
             for ph in phases:
                 phase_data.append([
-                    _cp(f"{ph.get('icon','')} {ph.get('phase','?')}"),
+                    _cp(ph.get('phase', '?')),
                     _cp(ph.get("confidence", "?")),
                     _cp(ph.get("evidence", "")),
                 ])
