@@ -36,5 +36,6 @@ qrcode[pil]==8.2
 
 # ── Optional — install only if using audio transcription or OCR features ──────
 openai-whisper
+imageio-ffmpeg
 # pytesseract
 # librosa

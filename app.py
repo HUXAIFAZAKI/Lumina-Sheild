@@ -720,7 +720,11 @@ with tab1:
                     tmp.write(audio_file.read())
                     tmp_path = tmp.name
                 with st.spinner("Whisper AI is transcribing your audio..."):
-                    import whisper
+                    import os, imageio_ffmpeg, whisper
+                    # Ensure bundled ffmpeg binary is on PATH so Whisper can find it
+                    ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+                    if ffmpeg_dir not in os.environ.get("PATH", ""):
+                        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
                     model = whisper.load_model("base")
                     result = model.transcribe(tmp_path)
                     st.session_state.raw_text = result["text"]
