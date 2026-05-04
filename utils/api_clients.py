@@ -136,7 +136,11 @@ def phishtank_check(url: str) -> bool:
 import whois
 @st.cache_data(ttl=3600*24, show_spinner=False)
 def whois_lookup(domain: str) -> dict:
+    import socket as _socket
+    _old_timeout = _socket.getdefaulttimeout()
     try:
+        # Port 43 (WHOIS) is often blocked on cloud platforms — enforce a hard timeout
+        _socket.setdefaulttimeout(10)
         w = whois.whois(domain)
         return {
             "registrar": w.registrar,
@@ -146,6 +150,8 @@ def whois_lookup(domain: str) -> dict:
         }
     except:
         return {}
+    finally:
+        _socket.setdefaulttimeout(_old_timeout)
 
 # ---- DNS Resolution via dnspython (FREE, no API key) ----
 import dns.resolver

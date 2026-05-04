@@ -922,6 +922,142 @@ def generate_deep_pdf(
             story.append(pt)
         story.append(Spacer(1, 10))
 
+    # ===== VT HISTORY & REPUTATION =====
+    vt_first_sub  = details.get("vt_first_submission")
+    vt_last_anal  = details.get("vt_last_analysis")
+    vt_times_sub  = details.get("vt_times_submitted")
+    vt_rep        = iocs.get("vt_reputation")
+    vt_votes      = details.get("vt_votes", {})
+    if vt_first_sub or vt_last_anal or vt_rep is not None:
+        story.append(Paragraph("VirusTotal History & Reputation", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        try:
+            fs_str = datetime.fromtimestamp(vt_first_sub).strftime("%Y-%m-%d") if vt_first_sub else "N/A"
+            la_str = datetime.fromtimestamp(vt_last_anal).strftime("%Y-%m-%d") if vt_last_anal else "N/A"
+        except Exception:
+            fs_str, la_str = str(vt_first_sub), str(vt_last_anal)
+        vt_hist = [
+            ["First Submitted", "Last Analysis", "Times Submitted", "Reputation", "Harmless Votes", "Malicious Votes"],
+            [fs_str, la_str, str(vt_times_sub or "N/A"), str(vt_rep or "N/A"),
+             str(vt_votes.get("harmless", "N/A")), str(vt_votes.get("malicious", "N/A"))],
+        ]
+        vt_hist_t = Table(vt_hist, colWidths=[80, 80, 70, 65, 80, 80])
+        vt_hist_t.setStyle(_table_style(header_color="#555"))
+        story.append(vt_hist_t)
+        story.append(Spacer(1, 8))
+
+    # ===== FLAGGED ANTIVIRUS ENGINES =====
+    vt_vendors = iocs.get("vt_vendors", {})
+    flagged_vendors = {k: v for k, v in vt_vendors.items()
+                       if v.get("category") in ("malicious", "suspicious", "phishing")}
+    if flagged_vendors:
+        story.append(Paragraph("Flagged Antivirus Engines", subheading_style))
+        vt_data = [["Engine", "Category", "Result"]]
+        for vendor, info in sorted(flagged_vendors.items()):
+            vt_data.append([
+                _cp(info.get("engine_name", vendor)),
+                _cp(info.get("category", "").upper()),
+                _cp(info.get("result", "N/A")),
+            ])
+        vt_t2 = Table(vt_data, colWidths=[180, 100, 230])
+        vt_t2.setStyle(_table_style(header_color="#E5A100"))
+        story.append(vt_t2)
+        story.append(Spacer(1, 8))
+
+    # ===== SITE CATEGORIES =====
+    cats = iocs.get("vt_categories", {})
+    if cats:
+        story.append(Paragraph("Site Categories", subheading_style))
+        for vendor, category in cats.items():
+            story.append(Paragraph(f"• <b>{vendor}</b>: {category}", normal_style))
+        story.append(Spacer(1, 8))
+
+    # ===== HTTP RESPONSE =====
+    http_info = iocs.get("vt_http_response", {})
+    if http_info and http_info.get("status_code"):
+        story.append(Paragraph("Last HTTP Response", subheading_style))
+        http_rows = [["Status", "Server", "Content-Type", "Content-Length"]]
+        http_rows.append([
+            str(http_info.get("status_code", "N/A")),
+            str(http_info.get("server", "N/A") or "N/A"),
+            str(http_info.get("content_type", "N/A") or "N/A")[:50],
+            str(http_info.get("content_length", "N/A")),
+        ])
+        http_t = Table(http_rows, colWidths=[55, 140, 200, 115])
+        http_t.setStyle(_table_style(header_color="#555"))
+        story.append(http_t)
+        story.append(Spacer(1, 8))
+
+    # ===== DOM HEURISTICS =====
+    dom_heuristics = iocs.get("dom_heuristics")
+    if dom_heuristics:
+        story.append(Paragraph("Zero-Day DOM Heuristics", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        story.append(Paragraph(_md_to_rl(str(dom_heuristics)), normal_style))
+        story.append(Spacer(1, 10))
+
+    # ===== REDIRECT CHAIN =====
+    redirect_chain = iocs.get("redirect_chain", [])
+    if redirect_chain:
+        story.append(Paragraph("Redirect Chain", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        for idx, link in enumerate(redirect_chain):
+            prefix = f"[{idx+1}] " if idx == 0 else f"  ↓  [{idx+1}] "
+            story.append(Paragraph(f"{prefix}{link}", code_style))
+        story.append(Spacer(1, 10))
+
+    # ===== WHOIS INFORMATION =====
+    whois_data = details.get("whois", {})
+    if whois_data:
+        story.append(Paragraph("WHOIS Information", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        whois_rows = [[_cp(str(k)), _cp(str(v))] for k, v in whois_data.items()]
+        if whois_rows:
+            whois_tbl = Table([["Field", "Value"]] + whois_rows, colWidths=[140, 370])
+            whois_tbl.setStyle(_table_style(header_color="#1a1714", alt_row="#f9f7f3"))
+            story.append(whois_tbl)
+        story.append(Spacer(1, 8))
+
+    # ===== ABUSEIPDB =====
+    abuse = details.get("abuseipdb", {})
+    if abuse:
+        story.append(Paragraph("AbuseIPDB Intelligence", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        abuse_rows = [["Abuse Score", "Country", "ISP", "Usage Type", "Total Reports", "Last Reported"]]
+        abuse_rows.append([
+            _cp(f"{abuse.get('abuseConfidenceScore', 'N/A')}%"),
+            _cp(abuse.get("countryCode", "N/A")),
+            _cp(str(abuse.get("isp", "N/A"))),
+            _cp(str(abuse.get("usageType", "N/A"))),
+            _cp(str(abuse.get("totalReports", "N/A"))),
+            _cp(str(abuse.get("lastReportedAt", "N/A"))[:20]),
+        ])
+        abuse_tbl = Table(abuse_rows, colWidths=[70, 50, 130, 100, 70, 90])
+        abuse_tbl.setStyle(_table_style(header_color="#c33", alt_row="#fff5f5"))
+        story.append(abuse_tbl)
+        story.append(Spacer(1, 10))
+
+    # ===== THREATFOX IOCs =====
+    threatfox_hits = iocs.get("threatfox", [])
+    if not threatfox_hits:
+        threatfox_hits = details.get("threatfox", [])
+    if threatfox_hits:
+        story.append(Paragraph("ThreatFox IOC Intelligence", heading_style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#ddd5c8"), spaceAfter=6))
+        tf_rows = [["IOC Value", "Threat Type", "Malware", "Confidence", "First Seen"]]
+        for hit in threatfox_hits[:20]:
+            tf_rows.append([
+                _cp(str(hit.get("ioc_value", "N/A"))),
+                _cp(str(hit.get("threat_type", "N/A"))),
+                _cp(str(hit.get("malware", "N/A"))),
+                _cp(str(hit.get("confidence_level", "N/A"))),
+                _cp(str(hit.get("first_seen", "N/A"))[:20]),
+            ])
+        tf_tbl = Table(tf_rows, colWidths=[155, 90, 110, 60, 95])
+        tf_tbl.setStyle(_table_style(header_color="#b71c1c", alt_row="#fff5f5"))
+        story.append(tf_tbl)
+        story.append(Spacer(1, 10))
+
     # ══════════════════════════════════════════════════════════════════════
     # DEEP MODE SECTIONS
     # ══════════════════════════════════════════════════════════════════════

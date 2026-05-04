@@ -305,4 +305,4 @@ def get_annotations(target):
     conn = get_db()
     rows = conn.execute("SELECT id, note, tags, timestamp FROM annotations WHERE target = ? ORDER BY timestamp DESC", (target,)).fetchall()
     conn.close()
-    return rows
+    return [dict(row) for row in rows]

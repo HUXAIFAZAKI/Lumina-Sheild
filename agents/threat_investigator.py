@@ -455,7 +455,13 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
 
         def task_resolve_ip():
             try:
-                return domain if _is_ip(domain) else socket.gethostbyname(domain)
+                if _is_ip(domain):
+                    return domain
+                # Use a thread-based timeout so gethostbyname can't hang forever
+                import concurrent.futures as _dns_cf
+                with _dns_cf.ThreadPoolExecutor(max_workers=1) as _dns_ex:
+                    _f = _dns_ex.submit(socket.gethostbyname, domain)
+                    return _f.result(timeout=8)
             except Exception:
                 return None
 
