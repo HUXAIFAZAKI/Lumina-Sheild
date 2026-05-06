@@ -679,15 +679,27 @@ st.markdown("""
         }
 
         /* ── ANALYST MODE RADIO (Basic / Deep Mode) ─────────── */
-        /* Let the horizontal radio wrap to a second line if needed */
-        [data-testid="stRadio"] > div[role="radiogroup"] {
+        /* Scoped to .ls-mode-radio wrapper — does NOT affect other radios */
+        .ls-mode-radio [data-testid="stRadio"] {
+            width: 100% !important;
+        }
+        .ls-mode-radio [data-testid="stRadio"] > div {
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .ls-mode-radio [data-testid="stRadio"] > div[role="radiogroup"] {
             flex-wrap: wrap !important;
             gap: 6px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            align-items: stretch !important;
         }
-        [data-testid="stRadio"] > div[role="radiogroup"] > label {
-            flex: 1 1 auto !important;
+        .ls-mode-radio [data-testid="stRadio"] > div[role="radiogroup"] > label {
+            flex: 1 1 calc(50% - 6px) !important;
             min-width: 120px !important;
             justify-content: center !important;
+            margin: 0 !important;
         }
 
         /* ── Cards ─────────────────────────────────────────── */
@@ -765,13 +777,14 @@ st.markdown("""
             font-size: 0.72rem !important;
         }
 
-        /* ── Analyst mode radio: stack vertically ───────────── */
-        [data-testid="stRadio"] > div[role="radiogroup"] {
+        /* ── Analyst mode radio: stack vertically on small phones ── */
+        .ls-mode-radio [data-testid="stRadio"] > div[role="radiogroup"] {
             flex-direction: column !important;
         }
-        [data-testid="stRadio"] > div[role="radiogroup"] > label {
+        .ls-mode-radio [data-testid="stRadio"] > div[role="radiogroup"] > label {
             width: 100% !important;
             min-width: 0 !important;
+            flex: 1 1 100% !important;
         }
 
         /* ── Stat cards — 2-per-row even on phones ──────────── */
@@ -3127,6 +3140,7 @@ def _render_cyber_deep_mode():
 # TAB 2: CYBER ANALYST  (Basic + Deep Mode dispatch)
 # ===================================================
 with tab2:
+    st.markdown('<div class="ls-mode-radio">', unsafe_allow_html=True)
     analyst_mode = st.radio(
         "Analysis Mode",
         ["🔍 Basic", "🔬 Deep Mode"],
@@ -3134,6 +3148,7 @@ with tab2:
         key="analyst_mode",
         help="Basic: rapid threat scan & IOC analysis  ·  Deep: full OSINT, infrastructure mapping, threat actor profiling & YARA forge",
     )
+    st.markdown('</div>', unsafe_allow_html=True)
     if analyst_mode == "🔍 Basic":
         _render_cyber_basic_mode()
     else:
