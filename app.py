@@ -1621,88 +1621,107 @@ def _render_cyber_basic_mode():
         </p>
     </div>
     """, unsafe_allow_html=True)
-    url = st.text_input("🎯 Target — URL, domain, IP, or file hash", key="cyber_input",
-                        placeholder="e.g. malware-site.ru · 192.168.1.1 · d41d8cd98f00b204e9800998ecf8427e")
+    url = st.session_state.get("cyber_input", "")
     cyber_target = normalize_investigation_input(url, {"url", "domain", "ip", "hash"}) if url.strip() else None
-    if cyber_target and cyber_target["extracted"]:
-        st.info(cyber_target["message"])
 
     if "cyber_result" not in st.session_state and cyber_target and cyber_target["value"]:
         restored_result = _restore_cached_cyber_result(cyber_target["value"])
         if restored_result is not None:
             st.session_state.cyber_result = restored_result
             st.session_state.cyber_target = cyber_target["value"]
+            st.session_state.cyber_last_scan_notice = {
+                "from_cache": True,
+            }
+            st.rerun()
 
-    if "cyber_result" not in st.session_state and st.button("🔍 Run Investigation", key="cyber_btn"):
-        if not url.strip():
-            st.warning("⚠️ Please enter a URL, domain, IP, or file hash first.")
-        elif not cyber_target or not cyber_target["value"]:
-            st.warning(cyber_target["message"] if cyber_target else "No valid target found.")
-        else:
-            target_value = cyber_target["value"]
-            target_kind = cyber_target["kind"]
+    if "cyber_result" not in st.session_state:
+        url = st.text_input("🎯 Target — URL, domain, IP, or file hash", key="cyber_input",
+                            placeholder="e.g. malware-site.ru · 192.168.1.1 · d41d8cd98f00b204e9800998ecf8427e")
+        cyber_target = normalize_investigation_input(url, {"url", "domain", "ip", "hash"}) if url.strip() else None
+        if cyber_target and cyber_target["extracted"]:
+            st.info(cyber_target["message"])
 
-            _progress = st.progress(0, text="Initializing threat scan…")
-            _status = st.empty()
-            _steps_ca = [
-                "Initializing multi-engine threat scan",
-                "Querying global threat intelligence",
-                "Cross-referencing reputation databases",
-                "Mapping network topology & IP data",
-                "Enriching with network intelligence",
-                "Gathering passive DNS & subdomain data",
-                "Running AI-powered forensic analysis",
-            ]
-            def _ca_step(n, total=7, label=""):
-                step_idx = min(n, len(_steps_ca) - 1)
-                frac = min(1.0, n / len(_steps_ca))
-                _progress.progress(frac, text=_steps_ca[step_idx])
-                items = "".join([
-                    "<li class='ls-step done'>✅ " + s + "</li>" if i < n
-                    else "<li class='ls-step running'>⏳ " + s + "</li>" if i == n
-                    else "<li class='ls-step pending'>○ " + s + "</li>"
-                    for i, s in enumerate(_steps_ca)
-                ])
-                _status.markdown("<div class='info-card' style='padding:0.9rem 1.2rem;margin:0;'><ul class='ls-steps'>" + items + "</ul></div>", unsafe_allow_html=True)
+        if st.button("🔍 Run Investigation", key="cyber_btn"):
+            if not url.strip():
+                st.warning("⚠️ Please enter a URL, domain, IP, or file hash first.")
+            elif not cyber_target or not cyber_target["value"]:
+                st.warning(cyber_target["message"] if cyber_target else "No valid target found.")
+            else:
+                target_value = cyber_target["value"]
+                target_kind = cyber_target["kind"]
 
-            _ca_step(0)
-            try:
-                if st.session_state.get('demo_mode'):
-                    result = get_mock_threat_result(target_value)
-                    _ca_step(len(_steps_ca))
-                else:
-                    result = investigate_threat_cached(
-                        file_hash=target_value if target_kind == "hash" else None,
-                        url=target_value if target_kind != "hash" else None,
-                        progress_callback=_ca_step,
-                    )
-            except Exception as _inv_err:
+                _progress = st.progress(0, text="Initializing threat scan…")
+                _status = st.empty()
+                _steps_ca = [
+                    "Initializing multi-engine threat scan",
+                    "Querying global threat intelligence",
+                    "Cross-referencing reputation databases",
+                    "Mapping network topology & IP data",
+                    "Enriching with network intelligence",
+                    "Gathering passive DNS & subdomain data",
+                    "Running AI-powered forensic analysis",
+                ]
+                def _ca_step(n, total=7, label=""):
+                    step_idx = min(n, len(_steps_ca) - 1)
+                    frac = min(1.0, n / len(_steps_ca))
+                    _progress.progress(frac, text=_steps_ca[step_idx])
+                    items = "".join([
+                        "<li class='ls-step done'>✅ " + s + "</li>" if i < n
+                        else "<li class='ls-step running'>⏳ " + s + "</li>" if i == n
+                        else "<li class='ls-step pending'>○ " + s + "</li>"
+                        for i, s in enumerate(_steps_ca)
+                    ])
+                    _status.markdown("<div class='info-card' style='padding:0.9rem 1.2rem;margin:0;'><ul class='ls-steps'>" + items + "</ul></div>", unsafe_allow_html=True)
+
+                _ca_step(0)
+                try:
+                    if st.session_state.get('demo_mode'):
+                        result = get_mock_threat_result(target_value)
+                        _ca_step(len(_steps_ca))
+                    else:
+                        result = investigate_threat_cached(
+                            file_hash=target_value if target_kind == "hash" else None,
+                            url=target_value if target_kind != "hash" else None,
+                            progress_callback=_ca_step,
+                        )
+                except Exception as _inv_err:
+                    _progress.empty()
+                    _status.empty()
+                    st.error(f"❌ Investigation failed: {_inv_err}")
+                    st.stop()
+
                 _progress.empty()
                 _status.empty()
-                st.error(f"❌ Investigation failed: {_inv_err}")
-                st.stop()
 
-            _progress.empty()
-            _status.empty()
+                st.session_state.cyber_result = result
+                st.session_state.cyber_target = target_value
+                st.session_state.cyber_last_scan_notice = {
+                    "from_cache": bool(result.get("_from_cache")),
+                }
 
-            st.session_state.cyber_result = result
-            st.session_state.cyber_target = target_value
+                try:
+                    from data.db import log_ioc
+                    sub_id = log_submission(target_value, "Cyber", "app")
+                    for ip in result.get("ips", []):
+                        log_ioc(sub_id, "IP", ip)
+                    for d in result.get("domains", []):
+                        log_ioc(sub_id, "Domain", d)
+                except Exception:
+                    pass
 
-            if result.get("_from_cache"):
-                st.toast("⚡ Result loaded from disk cache (12h TTL)", icon="💾")
-
-            try:
-                from data.db import log_ioc
-                sub_id = log_submission(target_value, "Cyber", "app")
-                for ip in result.get("ips", []):
-                    log_ioc(sub_id, "IP", ip)
-                for d in result.get("domains", []):
-                    log_ioc(sub_id, "Domain", d)
-            except Exception:
-                pass
+                # Fresh rerender is noticeably faster than finishing the whole result page
+                # in the same run, and cache restoration keeps Streamlit Cloud resilient.
+                st.rerun()
 
     # ---- Display results if we have them ----
     if "cyber_result" in st.session_state:
+        notice = st.session_state.pop("cyber_last_scan_notice", None)
+        if notice:
+            if notice.get("from_cache"):
+                st.toast("⚡ Result loaded from disk cache (12h TTL)", icon="💾")
+            else:
+                st.toast("✅ Investigation complete", icon="🛡️")
+
         # New Search button — lets user clear results and analyse a different target
         if st.button("🔄 New Search", key="cyber_clear_btn", help="Clear current results and scan a new target"):
             for _k in list(st.session_state.keys()):
