@@ -602,16 +602,190 @@ st.markdown("""
         background-color: #E5A100 !important;
     }
 
-    @media (max-width: 768px) {
-        .ls-header h1 { font-size: 2rem !important; }
-        .feature-grid { grid-template-columns: 1fr 1fr; }
-        .stTabs [data-baseweb="tab"] { padding: 0.5rem 0.9rem !important; font-size: 0.78rem !important; }
-        .block-container { padding-left: 1rem !important; padding-right: 1rem !important; }
+    /* ── Global mobile-safe utilities ───────────────────── */
+    /* Prevent any element from causing horizontal overflow */
+    .ls-card, .verdict-card, .info-card, .tactic-card, .feed-card, .stat-card {
+        max-width: 100%;
+        overflow-wrap: break-word;
+        word-break: break-word;
     }
+    /* Badge rows always wrap */
+    .ls-header .badge-row { flex-wrap: wrap; }
+    /* Overall badge container centers on all sizes */
+    div[style*="text-align:center"] .overall-badge { max-width: 100%; }
+
+    /* ── Dashboard stat grid ─────────────────────────────── */
+    .ls-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 1.2rem;
+    }
+    @media (max-width: 768px) {
+        .ls-stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+    }
+    @media (max-width: 360px) {
+        .ls-stat-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    }
+
+    @media (max-width: 768px) {
+        /* ── Header ───────────────────────────────────────── */
+        .ls-header {
+            padding: 1.4rem 1rem 1.1rem !important;
+            border-radius: 16px !important;
+            margin-bottom: 1.2rem !important;
+        }
+        .ls-header h1 { font-size: 1.9rem !important; }
+        .ls-header .tagline { font-size: 0.84rem !important; }
+
+        /* ── Container ────────────────────────────────────── */
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+            padding-top: 1rem !important;
+        }
+
+        /* ── Stack ALL Streamlit columns on mobile ─────────── */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0 !important;
+        }
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 0 !important;
+        }
+
+        /* ── PRIMARY NAV TABS (Basic / Cyber / Dashboard) ───── */
+        /* Wrap the tab list in a scrollable container */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+            justify-content: flex-start !important;
+            -webkit-overflow-scrolling: touch !important;
+            scrollbar-width: none !important;
+            padding: 5px 5px 8px !important;
+            /* give a slight shadow hint that tabs continue off-screen */
+            -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%) !important;
+            mask-image: linear-gradient(to right, black 85%, transparent 100%) !important;
+        }
+        .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none !important; }
+        .stTabs [data-baseweb="tab"] {
+            padding: 0.48rem 1rem !important;
+            font-size: 0.8rem !important;
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            border-radius: 10px !important;
+        }
+
+        /* ── ANALYST MODE RADIO (Basic / Deep Mode) ─────────── */
+        /* Let the horizontal radio wrap to a second line if needed */
+        [data-testid="stRadio"] > div[role="radiogroup"] {
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+        }
+        [data-testid="stRadio"] > div[role="radiogroup"] > label {
+            flex: 1 1 auto !important;
+            min-width: 120px !important;
+            justify-content: center !important;
+        }
+
+        /* ── Cards ─────────────────────────────────────────── */
+        .ls-card, .verdict-card, .info-card, .tactic-card, .feed-card {
+            padding: 1rem 1.1rem !important;
+            border-radius: 14px !important;
+        }
+
+        /* ── Feature grid ───────────────────────────────────── */
+        .feature-grid { grid-template-columns: 1fr 1fr !important; }
+
+        /* ── Overall verdict badge ──────────────────────────── */
+        .overall-badge {
+            font-size: 1rem !important;
+            padding: 0.5rem 1.2rem !important;
+            letter-spacing: 0.8px !important;
+        }
+
+        /* ── Stat cards — 2-per-row on tablet ───────────────── */
+        .stat-card { min-height: 90px !important; }
+        .stat-num  { font-size: 2.4rem !important; }
+
+        /* ── Risk gauge ─────────────────────────────────────── */
+        .risk-gauge { height: 10px !important; }
+
+        /* ── Section headers ────────────────────────────────── */
+        .ls-section-header { font-size: 0.95rem !important; }
+
+        /* ── Redirect chain ─────────────────────────────────── */
+        .redirect-step { font-size: 0.72rem !important; word-break: break-all !important; }
+
+        /* ── Link buttons ───────────────────────────────────── */
+        .stLinkButton > a {
+            font-size: 0.78rem !important;
+            padding: 0.4rem 0.9rem !important;
+        }
+
+        /* ── Cyber deep mode: flex rows inside cards ────────── */
+        .ls-ioc-flex-row {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+        }
+        .ls-ioc-flex-row .ls-ioc-ratio {
+            min-width: 0 !important;
+            width: 100% !important;
+            text-align: left !important;
+        }
+        .ls-vendor-count-row { flex-wrap: wrap !important; gap: 6px 12px !important; }
+
+        /* ── Community feed: upvote column stays inline ─────── */
+        /* Override full-stack for feed rows — keep upvote beside the card */
+        .ls-feed-row [data-testid="column"]:first-child { flex: 1 1 75% !important; }
+        .ls-feed-row [data-testid="column"]:last-child  { flex: 0 1 60px !important; width: auto !important; }
+    }
+
     @media (max-width: 480px) {
-        .feature-grid { grid-template-columns: 1fr; }
-        .ls-header .badge-row { gap: 4px; }
-        .ls-badge { font-size: 0.66rem; padding: 2px 7px; }
+        .ls-header { padding: 1.1rem 0.85rem 1rem !important; }
+        .ls-header h1 { font-size: 1.5rem !important; }
+        .ls-header .tagline { font-size: 0.78rem !important; }
+        .ls-header .badge-row { gap: 4px !important; }
+        .ls-badge { font-size: 0.64rem !important; padding: 2px 7px !important; }
+        .feature-grid { grid-template-columns: 1fr !important; }
+        .overall-badge {
+            font-size: 0.88rem !important;
+            padding: 0.45rem 1rem !important;
+            letter-spacing: 0.5px !important;
+        }
+        .ls-card, .verdict-card, .info-card, .tactic-card {
+            padding: 0.85rem 0.9rem !important;
+        }
+
+        /* ── Primary tabs: shorter padding on tiny screens ──── */
+        .stTabs [data-baseweb="tab"] {
+            padding: 0.42rem 0.75rem !important;
+            font-size: 0.72rem !important;
+        }
+
+        /* ── Analyst mode radio: stack vertically ───────────── */
+        [data-testid="stRadio"] > div[role="radiogroup"] {
+            flex-direction: column !important;
+        }
+        [data-testid="stRadio"] > div[role="radiogroup"] > label {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        /* ── Stat cards — 2-per-row even on phones ──────────── */
+        .stat-card { min-height: 80px !important; }
+        .stat-num  { font-size: 2rem !important; }
+
+        /* ── Full-width buttons ──────────────────────────────── */
+        .stButton > button { width: 100% !important; }
+        .stLinkButton > a {
+            width: 100% !important;
+            display: block !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+        }
     }
     /* Respect OS motion preference — disable only decorative animations, keep functional transitions */
     @media (prefers-reduced-motion: reduce) {
@@ -1331,7 +1505,7 @@ with tab1:
             badge_cls = f"badge-{label.lower()}"
             st.markdown(f"""
             <div class="verdict-card">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
                     <span class="severity-badge {badge_cls}">{emoji} {label}</span>
                     <span style="font-size:0.78rem; color:#7a7268; font-weight:600;">Confidence {conf}%</span>
                 </div>
@@ -1405,10 +1579,10 @@ with tab1:
             _geo_html = ", ".join(f"🌍 {g}" for g in nc.get("geographic_spread", []))
             st.markdown(f"""
             <div class="tactic-card" style="border-left:4px solid {_nc_conf_color};">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                     <strong style="font-size:1rem;color:#1a1714;">🧬 {nc.get('cluster_name','Unknown Cluster')}</strong>
                     <span style="font-size:0.75rem;font-weight:700;color:{_nc_conf_color};background:{_nc_conf_color}18;
-                                 padding:3px 12px;border-radius:20px;">{nc.get('confidence','?')} Confidence Match</span>
+                                 padding:3px 12px;border-radius:20px;white-space:nowrap;">{nc.get('confidence','?')} Confidence Match</span>
                 </div>
                 <p style="margin:0 0 8px;font-size:0.88rem;color:#4a4540;line-height:1.6;">{nc.get('description','')}</p>
                 <div style="display:flex;gap:20px;font-size:0.82rem;color:#7a7268;margin-bottom:8px;flex-wrap:wrap;">
@@ -1862,7 +2036,7 @@ def _render_cyber_basic_mode():
                     bar_w = max(2, sc_prob)
                     bars_html += f"""
                     <div style='margin-bottom:10px;'>
-                        <div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;'>
+                        <div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:2px;margin-bottom:3px;'>
                             <span style='font-size:0.85rem;font-weight:600;color:#1a1714;'>{sc_icon} {sc_name}</span>
                             <span style='font-size:0.85rem;font-weight:800;color:{sc_color};'>{sc_prob}%</span>
                         </div>
@@ -1906,19 +2080,19 @@ def _render_cyber_basic_mode():
             det_color = "#4CAF50" if flagged == 0 else "#FF9800" if flagged < 5 else "#f44336"
             st.markdown(f"""
             <div class="info-card">
-                <div style="display:flex; align-items:center; gap:20px;">
-                    <div style="text-align:center; min-width:120px;">
+                <div class="ls-ioc-flex-row" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <div class="ls-ioc-ratio" style="text-align:center; min-width:100px;">
                         <div style="font-size:2.5rem; font-weight:800; color:{det_color};">{flagged}/{total}</div>
                         <div style="font-size:0.85rem; color:#666;">vendors flagged</div>
                     </div>
-                    <div style="flex:1;">
+                    <div style="flex:1; min-width:200px;">
                         <div style="display:flex; gap:4px; height:18px; border-radius:9px; overflow:hidden;">
                             <div style="width:{mal/max(total,1)*100}%; background:#f44336;" title="Malicious: {mal}"></div>
                             <div style="width:{sus/max(total,1)*100}%; background:#FF9800;" title="Suspicious: {sus}"></div>
                             <div style="width:{harm/max(total,1)*100}%; background:#4CAF50;" title="Harmless: {harm}"></div>
                             <div style="width:{undet/max(total,1)*100}%; background:#9E9E9E;" title="Undetected: {undet}"></div>
                         </div>
-                        <div style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem; color:#666;">
+                        <div class="ls-vendor-count-row" style="display:flex; gap:10px 16px; margin-top:8px; font-size:0.8rem; color:#666; flex-wrap:wrap;">
                             <span>🔴 Malicious: {mal}</span>
                             <span>🟠 Suspicious: {sus}</span>
                             <span>🟢 Harmless: {harm}</span>
@@ -2983,17 +3157,28 @@ with tab3:
     if hm_rows:
         import plotly.express as px; import folium; from streamlit_folium import st_folium
         df = pd.DataFrame(hm_rows, columns=["city","category","verdict","date"])
-        s1,s2,s3,s4 = st.columns(4)
-        s1.markdown(f'<div class="stat-card"><span class="stat-num">{len(df)}</span><p>Total Reports</p></div>', unsafe_allow_html=True)
-        s2.markdown(f'<div class="stat-card"><span class="stat-num">{len(df[df["verdict"].isin(["FAKE","FALSE"])])}</span><p>Fake / False</p></div>', unsafe_allow_html=True)
-        s3.markdown(f'<div class="stat-card"><span class="stat-num">{len(df[df["verdict"]=="SCAM"])}</span><p>Scams Detected</p></div>', unsafe_allow_html=True)
-        s4.markdown(f'<div class="stat-card"><span class="stat-num">{df["city"].nunique()}</span><p>Cities Reporting</p></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="ls-stat-grid">
+            <div class="stat-card"><span class="stat-num">{len(df)}</span><p>Total Reports</p></div>
+            <div class="stat-card"><span class="stat-num">{len(df[df["verdict"].isin(["FAKE","FALSE"])])}</span><p>Fake / False</p></div>
+            <div class="stat-card"><span class="stat-num">{len(df[df["verdict"]=="SCAM"])}</span><p>Scams Detected</p></div>
+            <div class="stat-card"><span class="stat-num">{df["city"].nunique()}</span><p>Cities Reporting</p></div>
+        </div>
+        """, unsafe_allow_html=True)
         st.subheader("🗺️ Global Threat Heatmap")
         cc2 = df.groupby("city").size().reset_index(name="n")
         vc = [(GLOBAL_CITY_COORDS[c][0],GLOBAL_CITY_COORDS[c][1]) for c in cc2["city"] if c in GLOBAL_CITY_COORDS]
         clat = sum(c[0] for c in vc)/max(len(vc),1) if vc else 30.37
         clon = sum(c[1] for c in vc)/max(len(vc),1) if vc else 69.34
-        m = folium.Map(location=[clat,clon], zoom_start=3, tiles="cartodbpositron")
+        m = folium.Map(
+            location=[clat, clon],
+            zoom_start=3,
+            tiles="cartodbpositron",
+            max_bounds=True,
+            min_lat=-85, max_lat=85,
+            min_lon=-180, max_lon=180,
+            world_copy_jump=False,
+        )
         for _,row in cc2.iterrows():
             c = row["city"]
             if c in GLOBAL_CITY_COORDS:
@@ -3027,10 +3212,12 @@ with tab3:
                 ts = datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S"); d = datetime.now()-ts
                 tstr = f"{d.days}d ago" if d.days>0 else f"{d.seconds//3600}h ago" if d.seconds>3600 else f"{d.seconds//60}m ago"
             except: tstr = item["timestamp"]
+            st.markdown('<div class="ls-feed-row">', unsafe_allow_html=True)
             f1,f2 = st.columns([0.85,0.15])
             with f1: st.markdown(f'<div class="feed-card"><span class="severity-badge {bc}">{v}</span> {item["snippet"][:100]} <span style="color:#b0a99c;float:right;font-size:0.78rem;">{tstr}</span></div>', unsafe_allow_html=True)
             with f2:
                 if st.button(f"⬆️ {item['upvotes']}", key=f"up_{item['id']}"): upvote_feed_item(item['id']); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
     else: st.info("No community items match this filter yet.")
 
 st.markdown('<div class="ls-footer">Lumina Shield &copy; 2026 &nbsp;&middot;&nbsp; GenAI Hackathon &nbsp;&middot;&nbsp; Protecting users worldwide &nbsp;&middot;&nbsp; <a href="#">Privacy</a></div>', unsafe_allow_html=True)
