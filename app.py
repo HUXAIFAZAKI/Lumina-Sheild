@@ -1630,6 +1630,29 @@ def _render_cyber_basic_mode():
                 _status.empty()
                 st.error(f"❌ Investigation failed: {_inv_err}")
                 st.stop()
+
+            # ── Generate AI summary NOW (while progress bar is still visible) ──
+            # Doing this here — before st.rerun() — means the display section never
+            # blocks on slow Groq calls. On the rerun, results render instantly from
+            # session_state. This is the fix for the Streamlit Cloud blank-result bug.
+            from agents.threat_investigator import generate_threat_summary, generate_narrative_intelligence
+            _ai_cache_key = f"cyber_ai_{target_value}"
+            _progress.progress(1.0, text="Generating AI threat intelligence…")
+            _status.empty()
+            try:
+                _narrative_result = generate_narrative_intelligence(target_value, result)
+            except Exception:
+                _narrative_result = {}
+            try:
+                _summary_result = generate_threat_summary(target_value, result,
+                                                          narrative_hint=_narrative_result)
+            except Exception:
+                _summary_result = "AI summary unavailable."
+            st.session_state[_ai_cache_key] = {
+                "summary":   _summary_result,
+                "narrative": _narrative_result,
+            }
+
             _progress.empty()
             _status.empty()
 
@@ -1637,8 +1660,6 @@ def _render_cyber_basic_mode():
                 st.toast("⚡ Result loaded from disk cache (12h TTL)", icon="💾")
             st.session_state.cyber_result = result
             st.session_state.cyber_target = target_value
-            # Clear any stale AI-summary cache so it regenerates for the new target
-            st.session_state.pop(f"cyber_ai_{target_value}", None)
 
             try:
                 from data.db import log_ioc
@@ -1650,8 +1671,7 @@ def _render_cyber_basic_mode():
             except Exception:
                 pass
 
-            # Force a clean rerun so results render in a fresh element tree
-            # (avoids Streamlit Cloud ghost-slot issue from progress placeholders)
+            # Clean rerun — session_state is fully populated, display renders instantly
             st.rerun()
 
     # ---- Display results if we have them ----
