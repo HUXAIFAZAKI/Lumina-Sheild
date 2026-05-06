@@ -426,6 +426,12 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
             except Exception:
                 pass
 
+    def _future_or_default(future, timeout: float, default):
+        try:
+            return future.result(timeout=timeout)
+        except Exception:
+            return default
+
     iocs = _build_ioc_result()
 
     if url and not file_hash and _looks_like_hash(url):
@@ -506,7 +512,8 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
 
 
         _cb(0, 7)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+        try:
             future_src = executor.submit(task_src)
             future_resolve = executor.submit(task_resolve_ip)
             future_sb = executor.submit(task_sb)
@@ -520,7 +527,7 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
             future_dom = executor.submit(task_dom)
             future_redirs = executor.submit(task_redirects)
 
-            src_results = future_src.result()
+            src_results = _future_or_default(future_src, 20, {})
             coverage = _apply_src_results(iocs, src_results, artifact_kind)
             _cb(1, 7)
 
@@ -530,7 +537,7 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
                     _apply_virustotal_data(iocs, vt_payload, is_hash_lookup=False)
             _cb(2, 7)
 
-            resolved_ip = future_resolve.result()
+            resolved_ip = _future_or_default(future_resolve, 10, None)
             if resolved_ip:
                 _safe_append(iocs["ips"], resolved_ip)
 
@@ -541,18 +548,18 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
             _cb(3, 7)
 
             # --- Safe Browsing ---
-            sb = future_sb.result()
+            sb = _future_or_default(future_sb, 10, {})
             if sb and "matches" in sb:
                 iocs["risk_score"] += 5
                 iocs["details"]["safe_browsing"] = "flagged"
 
             # --- PhishTank ---
-            if future_pt.result():
+            if _future_or_default(future_pt, 10, False):
                 iocs["risk_score"] += 5
                 iocs["details"]["phishtank"] = "known phishing"
 
             # --- URLScan ---
-            us = future_us.result()
+            us = _future_or_default(future_us, 20, {})
             if us and "data" in us:
                 iocs["details"]["urlscan"] = "scanned"
                 lists = us.get("lists", {})
@@ -565,33 +572,33 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
             _cb(4, 7)
 
             # --- WHOIS ---
-            w = future_whois.result() if future_whois else {}
+            w = _future_or_default(future_whois, 12, {}) if future_whois else {}
             if w:
                 _apply_whois_data(iocs, w)
 
             # --- AbuseIPDB ---
-            abuse = future_abuse.result() if future_abuse else {}
+            abuse = _future_or_default(future_abuse, 10, {}) if future_abuse else {}
             if abuse and "data" in abuse:
                 _apply_abuseipdb_data(iocs, {"check": abuse["data"]})
 
             # --- Shodan ---
-            shodan_res = future_shodan.result() if future_shodan else {}
+            shodan_res = _future_or_default(future_shodan, 10, {}) if future_shodan else {}
             if shodan_res:
                 iocs["details"]["shodan"] = shodan_res.get("ports", [])
 
             # --- IP Geo ---
-            geo = future_geo.result() if future_geo else {}
+            geo = _future_or_default(future_geo, 8, {}) if future_geo else {}
             if geo: iocs["geo"] = geo
             _cb(5, 7)
 
             # --- DNS ---
-            iocs["dns_records"] = future_dns.result()
+            iocs["dns_records"] = _future_or_default(future_dns, 8, {})
 
             # --- Tech Stack ---
-            iocs["tech_stack"] = future_tech.result()
+            iocs["tech_stack"] = _future_or_default(future_tech, 10, {})
 
             # --- ThreatFox ---
-            tf_data = future_tf.result()
+            tf_data = _future_or_default(future_tf, 10, [])
             if tf_data:
                 iocs["threatfox"] = tf_data[:10]
                 iocs["risk_score"] += 3
@@ -599,7 +606,7 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
             # --- AlienVault OTX (direct fallback if src integration missed it) ---
             if not coverage.get("alienvaultotx"):
                 try:
-                    otx_data = future_otx.result()
+                    otx_data = _future_or_default(future_otx, 10, {})
                     if otx_data:
                         _apply_otx_data(iocs, otx_data)
                         pulse_count = otx_data.get("pulse_info", {}).get("count", 0) or 0
@@ -610,16 +617,18 @@ def investigate_threat(url: str = None, file_hash: str = None, progress_callback
 
             # --- Subdomains ---
             try:
-                subs = future_subs.result()
+                subs = _future_or_default(future_subs, 15, [])
                 if subs: iocs["subdomains"] = subs[:20]
             except:
                 pass
             _cb(6, 7)
 
             # --- Heuristics & Redirects ---
-            iocs["dom_heuristics"] = future_dom.result()
-            iocs["redirect_chain"] = future_redirs.result()
+            iocs["dom_heuristics"] = _future_or_default(future_dom, 20, "DOM Analysis unavailable: timed out")
+            iocs["redirect_chain"] = _future_or_default(future_redirs, 10, [])
             _cb(7, 7)
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
 
     elif file_hash:

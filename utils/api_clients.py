@@ -24,7 +24,12 @@ def vt_url_scan(url: str) -> dict:
     if not VT_API_KEY: return {"error": "API key missing"}
     headers={"x-apikey": VT_API_KEY, "User-Agent": "LuminaShield/1.0 (Hackathon Project)"}
     # Step 1: Submit the URL
-    resp = requests.post("https://www.virustotal.com/api/v3/urls", data={"url": url}, headers=headers)
+    resp = requests.post(
+        "https://www.virustotal.com/api/v3/urls",
+        data={"url": url},
+        headers=headers,
+        timeout=15,
+    )
     if resp.status_code != 200:
         return {"error": f"Submit HTTP {resp.status_code}"}
     analysis_id = resp.json().get("data", {}).get("id")
@@ -35,7 +40,8 @@ def vt_url_scan(url: str) -> dict:
         _time.sleep(5)
         analysis_resp = requests.get(
             f"https://www.virustotal.com/api/v3/analyses/{analysis_id}",
-            headers=headers
+            headers=headers,
+            timeout=15,
         )
         if analysis_resp.status_code == 200:
             data = analysis_resp.json()
@@ -54,7 +60,8 @@ def vt_url_report(url: str) -> dict:
     url_id = _vt_url_id(url)
     resp = requests.get(
         f"https://www.virustotal.com/api/v3/urls/{url_id}",
-        headers=headers
+        headers=headers,
+        timeout=15,
     )
     if resp.status_code == 200:
         return resp.json()
@@ -64,7 +71,11 @@ def vt_url_report(url: str) -> dict:
 def vt_hash_lookup(file_hash: str) -> dict:
     if not VT_API_KEY: return {"error": "API key missing"}
     headers={"x-apikey": VT_API_KEY, "User-Agent": "LuminaShield/1.0 (Hackathon Project)"}
-    resp = requests.get(f"https://www.virustotal.com/api/v3/files/{file_hash}", headers=headers)
+    resp = requests.get(
+        f"https://www.virustotal.com/api/v3/files/{file_hash}",
+        headers=headers,
+        timeout=15,
+    )
     return resp.json() if resp.status_code == 200 else {}
 
 # ---- URLScan.io ----
@@ -119,14 +130,24 @@ def abuseipdb_check(ip: str) -> dict:
     if not ABUSEIPDB_KEY: return {}
     headers={"Key": ABUSEIPDB_KEY, "Accept": "application/json", "User-Agent": "LuminaShield/1.0 (Hackathon Project)"}
     params = {"ipAddress": ip, "maxAgeInDays": 90}
-    resp = requests.get("https://api.abuseipdb.com/api/v2/check", headers=headers, params=params)
+    resp = requests.get(
+        "https://api.abuseipdb.com/api/v2/check",
+        headers=headers,
+        params=params,
+        timeout=10,
+    )
     return resp.json() if resp.status_code == 200 else {}
 
 # ---- PhishTank (no key needed) ----
 @st.cache_data(ttl=3600*12, show_spinner=False)
 def phishtank_check(url: str) -> bool:
     try:
-        resp = requests.post("https://checkurl.phishtank.com/checkurl/", data={"url": url, "format": "json"}, headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"})
+        resp = requests.post(
+            "https://checkurl.phishtank.com/checkurl/",
+            data={"url": url, "format": "json"},
+            headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"},
+            timeout=10,
+        )
         data = resp.json()
         return data.get("results", {}).get("in_database") == "true"
     except:
@@ -162,9 +183,12 @@ def dns_resolve_all(domain: str) -> dict:
     records = {
         "A": [], "AAAA": [], "MX": [], "NS": [], "TXT": [], "CNAME": [],
     }
+    resolver = dns.resolver.Resolver()
+    resolver.timeout = 4
+    resolver.lifetime = 4
     for rtype in records.keys():
         try:
-            answers = dns.resolver.resolve(domain, rtype)
+            answers = resolver.resolve(domain, rtype)
             for rdata in answers:
                 val = str(rdata).strip('"')
                 if rtype == "MX":
@@ -180,7 +204,10 @@ def dns_reverse_lookup(ip: str) -> str:
     try:
         from dns import reversename
         rev_name = reversename.from_address(ip)
-        answers = dns.resolver.resolve(rev_name, "PTR")
+        resolver = dns.resolver.Resolver()
+        resolver.timeout = 4
+        resolver.lifetime = 4
+        answers = resolver.resolve(rev_name, "PTR")
         return str(answers[0])
     except:
         return ""
@@ -287,7 +314,12 @@ def safe_browsing_check(url: str) -> dict:
             "threatEntries": [{"url": url}]
         }
     }
-    resp = requests.post(api_url, json=body, headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"})
+    resp = requests.post(
+        api_url,
+        json=body,
+        headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"},
+        timeout=10,
+    )
     return resp.json() if resp.status_code == 200 else {}
 
 # ---- Shodan ----
@@ -295,7 +327,11 @@ def safe_browsing_check(url: str) -> dict:
 def shodan_host(ip: str) -> dict:
     if not SHODAN_KEY: return {}
     try:
-        resp = requests.get(f"https://api.shodan.io/shodan/host/{ip}?key={SHODAN_KEY}", headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"})
+        resp = requests.get(
+            f"https://api.shodan.io/shodan/host/{ip}?key={SHODAN_KEY}",
+            headers={"User-Agent": "LuminaShield/1.0 (Hackathon Project)"},
+            timeout=10,
+        )
         return resp.json() if resp.status_code == 200 else {}
     except:
         return {}
@@ -444,7 +480,10 @@ def email_security_check(domain: str) -> dict:
         # DMARC is typically at _dmarc.domain
         try:
             import dns.resolver as _res
-            ans = _res.resolve(f"_dmarc.{domain}", "TXT")
+            resolver = _res.Resolver()
+            resolver.timeout = 4
+            resolver.lifetime = 4
+            ans = resolver.resolve(f"_dmarc.{domain}", "TXT")
             for rdata in ans:
                 result["dmarc"] = str(rdata).strip('"')
         except Exception:
