@@ -1563,6 +1563,51 @@ with tab1:
 # ===============================
 # TAB 2: CYBER ANALYST — basic mode renderer
 # ===============================
+def _cyber_ai_session_key(target: str) -> str:
+    return f"cyber_ai_{submission_hash(target)}"
+
+
+def _restore_cached_cyber_result(target: str) -> dict | None:
+    try:
+        from utils.disk_cache import cache_get
+
+        restored = cache_get("investigate_threat", target)
+    except Exception:
+        return None
+
+    if restored is not None:
+        restored["_from_cache"] = True
+    return restored
+
+
+def _generate_cyber_ai_payload(target: str, result: dict) -> dict:
+    from agents.threat_investigator import generate_threat_summary, generate_narrative_intelligence
+
+    try:
+        narrative_result = generate_narrative_intelligence(target, result)
+    except Exception:
+        narrative_result = {}
+
+    try:
+        summary_result = generate_threat_summary(target, result, narrative_hint=narrative_result)
+    except Exception:
+        summary_result = "AI summary unavailable."
+
+    payload = {
+        "summary": summary_result,
+        "narrative": narrative_result,
+    }
+
+    try:
+        from utils.disk_cache import cache_set
+
+        cache_set("cyber_ai", payload, 3600 * 12, target)
+    except Exception:
+        pass
+
+    return payload
+
+
 def _render_cyber_basic_mode():
     st.markdown("""
     <div class='info-card'>
@@ -1581,6 +1626,12 @@ def _render_cyber_basic_mode():
     cyber_target = normalize_investigation_input(url, {"url", "domain", "ip", "hash"}) if url.strip() else None
     if cyber_target and cyber_target["extracted"]:
         st.info(cyber_target["message"])
+
+    if "cyber_result" not in st.session_state and cyber_target and cyber_target["value"]:
+        restored_result = _restore_cached_cyber_result(cyber_target["value"])
+        if restored_result is not None:
+            st.session_state.cyber_result = restored_result
+            st.session_state.cyber_target = cyber_target["value"]
 
     if "cyber_result" not in st.session_state and st.button("🔍 Run Investigation", key="cyber_btn"):
         if not url.strip():
@@ -1631,35 +1682,14 @@ def _render_cyber_basic_mode():
                 st.error(f"❌ Investigation failed: {_inv_err}")
                 st.stop()
 
-            # ── Generate AI summary NOW (while progress bar is still visible) ──
-            # Doing this here — before st.rerun() — means the display section never
-            # blocks on slow Groq calls. On the rerun, results render instantly from
-            # session_state. This is the fix for the Streamlit Cloud blank-result bug.
-            from agents.threat_investigator import generate_threat_summary, generate_narrative_intelligence
-            _ai_cache_key = f"cyber_ai_{target_value}"
-            _progress.progress(1.0, text="Generating AI threat intelligence…")
-            _status.empty()
-            try:
-                _narrative_result = generate_narrative_intelligence(target_value, result)
-            except Exception:
-                _narrative_result = {}
-            try:
-                _summary_result = generate_threat_summary(target_value, result,
-                                                          narrative_hint=_narrative_result)
-            except Exception:
-                _summary_result = "AI summary unavailable."
-            st.session_state[_ai_cache_key] = {
-                "summary":   _summary_result,
-                "narrative": _narrative_result,
-            }
-
             _progress.empty()
             _status.empty()
 
-            if result.get("_from_cache"):
-                st.toast("⚡ Result loaded from disk cache (12h TTL)", icon="💾")
             st.session_state.cyber_result = result
             st.session_state.cyber_target = target_value
+
+            if result.get("_from_cache"):
+                st.toast("⚡ Result loaded from disk cache (12h TTL)", icon="💾")
 
             try:
                 from data.db import log_ioc
@@ -1670,9 +1700,6 @@ def _render_cyber_basic_mode():
                     log_ioc(sub_id, "Domain", d)
             except Exception:
                 pass
-
-            # Clean rerun — session_state is fully populated, display renders instantly
-            st.rerun()
 
     # ---- Display results if we have them ----
     if "cyber_result" in st.session_state:
@@ -1686,8 +1713,6 @@ def _render_cyber_basic_mode():
         result = st.session_state.cyber_result
         current_target = st.session_state.get("cyber_target", url)
         from datetime import datetime
-        import concurrent.futures as _cf
-        from agents.threat_investigator import generate_threat_summary, generate_narrative_intelligence
 
         # ===== RISK SCORE + AI SUMMARY TOP ROW =====
         risk = result.get("risk_score", 0)
@@ -1696,27 +1721,21 @@ def _render_cyber_basic_mode():
         risk_color = "#4CAF50" if risk < 3 else "#FF9800" if risk < 6 else "#f44336" if risk < 8 else "#b71c1c"
         risk_pct = risk * 10
 
-        # AI summary/narrative — cached per target so the spinner doesn't fire on every re-render
-        _ai_cache_key = f"cyber_ai_{current_target}"
+        # AI summary/narrative — keep the session-state key short and stable for cloud deployments.
+        _ai_cache_key = _cyber_ai_session_key(current_target)
         if _ai_cache_key not in st.session_state:
-            with st.spinner("🔬 Finalising threat analysis…"):
-                # Narrative runs first — its top-scenario result is then passed into
-                # generate_threat_summary so both panels always tell the same story.
-                try:
-                    _narrative_result = generate_narrative_intelligence(current_target, result)
-                except Exception:
-                    _narrative_result = {}
-                try:
-                    _summary_result = generate_threat_summary(current_target, result,
-                                                              narrative_hint=_narrative_result)
-                except Exception:
-                    _summary_result = "AI summary unavailable."
-                st.session_state[_ai_cache_key] = {
-                    "summary":   _summary_result,
-                    "narrative": _narrative_result,
-                }
-        summary_text   = st.session_state[_ai_cache_key]["summary"]
-        narrative_data = st.session_state[_ai_cache_key]["narrative"]
+            try:
+                from utils.disk_cache import cache_get
+
+                cached_ai = cache_get("cyber_ai", current_target)
+                if cached_ai is not None:
+                    st.session_state[_ai_cache_key] = cached_ai
+            except Exception:
+                pass
+
+        ai_payload = st.session_state.get(_ai_cache_key) or {}
+        summary_text = ai_payload.get("summary", "")
+        narrative_data = ai_payload.get("narrative", {}) if isinstance(ai_payload.get("narrative", {}), dict) else {}
 
         # Convert AI markdown bold (**text**) and newlines to HTML so they render correctly
         def _md_to_html(text: str) -> str:
@@ -1744,7 +1763,24 @@ def _render_cyber_basic_mode():
 
         with c_summary:
             st.markdown("<div class='ls-section-header'><div class='icon-box'>🤖</div><span>AI Executive Summary</span></div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='info-card' style='margin-top:0;'><p style='margin:0;line-height:1.65;font-size:0.9rem;'>{_md_to_html(summary_text)}</p></div>", unsafe_allow_html=True)
+            if not summary_text:
+                st.markdown(
+                    "<div class='info-card' style='margin-top:0;'><p style='margin:0;line-height:1.65;font-size:0.9rem;'>"
+                    "AI summary generation is now on-demand in Basic Mode so the initial threat scan can render reliably on Streamlit Cloud."
+                    "</p></div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button("🤖 Generate AI Executive Summary", key=f"cyber_ai_btn_{submission_hash(current_target)}"):
+                    with st.spinner("Generating AI threat intelligence…"):
+                        ai_payload = _generate_cyber_ai_payload(current_target, result)
+                    st.session_state[_ai_cache_key] = ai_payload
+                    summary_text = ai_payload.get("summary", "")
+                    narrative_data = ai_payload.get("narrative", {}) if isinstance(ai_payload.get("narrative", {}), dict) else {}
+
+            if summary_text:
+                st.markdown(f"<div class='info-card' style='margin-top:0;'><p style='margin:0;line-height:1.65;font-size:0.9rem;'>{_md_to_html(summary_text)}</p></div>", unsafe_allow_html=True)
+            else:
+                st.caption("Raw threat intelligence results are available below even without the AI summary.")
 
         # ===== NARRATIVE INTELLIGENCE SCORE =====
         if narrative_data and not narrative_data.get("error") and narrative_data.get("scenarios"):
@@ -2049,7 +2085,7 @@ def _render_cyber_basic_mode():
         if st.button("📄 Generate PDF Report", key="pdf_btn"):
             pdf_path = generate_pdf(
                 current_target, result,
-                summary_text=summary_text,
+                summary_text=summary_text or "AI summary not generated.",
                 narrative_data=narrative_data,
             )
             with open(pdf_path, "rb") as f:
