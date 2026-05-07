@@ -23,8 +23,11 @@ init_db()
 @st.cache_resource
 def _load_whisper_model():
     """Load Whisper once; shared across all sessions."""
-    import whisper
-    return whisper.load_model("base")
+    try:
+        import whisper
+        return whisper.load_model("base")
+    except ImportError:
+        return None
 
 @st.cache_data(ttl=300)
 def _cities_list():
@@ -968,9 +971,12 @@ with tab1:
                     tmp_path = tmp.name
                 with st.spinner("Whisper AI is transcribing your audio..."):
                     model = _load_whisper_model()
-                    result = model.transcribe(tmp_path)
-                    st.session_state.raw_text = result["text"]
-                    st.rerun()
+                    if model is None:
+                        st.error("Audio transcription is not available in this deployment. Please type your text manually.")
+                    else:
+                        result = model.transcribe(tmp_path)
+                        st.session_state.raw_text = result["text"]
+                        st.rerun()
         if st.session_state.raw_text:
             st.text_area("Transcribed Text", value=st.session_state.raw_text, height=100, key="voice_text_area")
             if st.session_state.voice_text_area != st.session_state.raw_text:

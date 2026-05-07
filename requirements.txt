@@ -36,6 +36,6 @@ Pillow==12.2.0
 qrcode[pil]==8.2
 
 # ── Optional — install only if using audio transcription or OCR features ──────
-openai-whisper
+# openai-whisper  # Too heavy for Streamlit Cloud (pulls PyTorch); install locally only
 # pytesseract
 # librosa
