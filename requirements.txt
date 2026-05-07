@@ -21,7 +21,7 @@ tenacity==9.1.4
 beautifulsoup4==4.14.3
 pandas==3.0.2
 validators==0.35.0
-scikit-learn==1.6.1
+# scikit-learn==1.6.1
 
 # ── Visualization ─────────────────────────────────────────────────────────────
 folium==0.20.0
@@ -36,6 +36,6 @@ Pillow==12.2.0
 qrcode[pil]==8.2
 
 # ── Optional — install only if using audio transcription or OCR features ──────
-# openai-whisper  # Too heavy for Streamlit Cloud (pulls PyTorch); install locally only
+openai-whisper
 # pytesseract
 # librosa
