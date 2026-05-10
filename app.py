@@ -897,6 +897,16 @@ with tab1:
                                      index=_all_cities.index("Karachi") if "Karachi" in _all_cities else 0,
                                      key="user_location")
 
+    # ---- Clear stale results when input mode changes ----
+    if st.session_state.get("_last_input_mode") != input_mode:
+        for _stale_key in [
+            "citizen_result", "vision_forensics", "email_phishing_result",
+            "email_phishing_text", "email_phishing_area",
+        ]:
+            st.session_state.pop(_stale_key, None)
+        st.session_state.raw_text = ""
+        st.session_state["_last_input_mode"] = input_mode
+
     if "raw_text" not in st.session_state:
         st.session_state.raw_text = ""
 

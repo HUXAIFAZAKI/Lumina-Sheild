@@ -23,7 +23,7 @@ pandas==3.0.2
 validators==0.35.0
 scikit-learn
 
-# ── Visualization ─────────────────────────────────────────────────────────────
+# ── Visualization  ─────────────────────────────────────────────────────────────
 folium==0.20.0
 streamlit-folium==0.27.2
 plotly==6.7.0
